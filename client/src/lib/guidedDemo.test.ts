@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatGuidedDemoDuration, getGuidedDemoProgress, getUndispatchedGuidedScenario, guidedDemoDurationMs, guidedDemoSteps } from "./guidedDemo";
+import { formatGuidedDemoDuration, getGuidedDemoProgress, getGuidedReplayContrastState, getUndispatchedGuidedScenario, guidedDemoDurationMs, guidedDemoSteps } from "./guidedDemo";
 
 describe("guided judge demo", () => {
   it("covers every persisted authority scenario in a judge-sized walkthrough", () => {
@@ -27,5 +27,13 @@ describe("guided judge demo", () => {
     expect(getGuidedDemoProgress(0, "running")).toBe(13);
     expect(getGuidedDemoProgress(3, "paused")).toBe(50);
     expect(getGuidedDemoProgress(7, "complete")).toBe(100);
+  });
+
+  it("contrasts the fresh one-time capability with the refused replay at the right walkthrough stages", () => {
+    expect(getGuidedReplayContrastState(0, "idle")).toBe("waiting");
+    expect(getGuidedReplayContrastState(1, "running")).toBe("fresh-execution");
+    expect(getGuidedReplayContrastState(4, "paused")).toBe("protected-once");
+    expect(getGuidedReplayContrastState(6, "running")).toBe("replay-refused");
+    expect(getGuidedReplayContrastState(7, "complete")).toBe("complete");
   });
 });

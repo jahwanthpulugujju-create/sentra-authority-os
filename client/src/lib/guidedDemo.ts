@@ -1,4 +1,6 @@
 export type GuidedScenario = "Valid Action" | "Unauthorized Tool" | "Prompt Injection" | "Changed Request" | "Burst Anomaly" | "Replay Attempt";
+export type GuidedDemoStatus = "idle" | "running" | "paused" | "complete";
+export type GuidedReplayContrastState = "waiting" | "fresh-execution" | "protected-once" | "replay-refused" | "complete";
 
 export type GuidedDemoStep = {
   title: string;
@@ -32,8 +34,19 @@ export function getUndispatchedGuidedScenario(stepIndex: number, dispatchedSteps
   return scenario && !dispatchedSteps.has(stepIndex) ? scenario : undefined;
 }
 
-export function getGuidedDemoProgress(stepIndex: number, status: "idle" | "running" | "paused" | "complete") {
+export function getGuidedDemoProgress(stepIndex: number, status: GuidedDemoStatus) {
   if (status === "idle") return 0;
   if (status === "complete") return 100;
   return Math.min(100, Math.max(0, Math.round(((stepIndex + 1) / guidedDemoSteps.length) * 100)));
+}
+
+export function getGuidedReplayContrastState(stepIndex: number, status: GuidedDemoStatus): GuidedReplayContrastState {
+  if (status === "idle") return "waiting";
+  const validStep = guidedDemoSteps.findIndex(step => step.scenario === "Valid Action");
+  const replayStep = guidedDemoSteps.findIndex(step => step.scenario === "Replay Attempt");
+  if (status === "complete" || stepIndex > replayStep) return "complete";
+  if (stepIndex < validStep) return "waiting";
+  if (stepIndex === validStep) return "fresh-execution";
+  if (stepIndex < replayStep) return "protected-once";
+  return "replay-refused";
 }

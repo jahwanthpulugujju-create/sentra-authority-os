@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { isTransientNetworkError } from "@/lib/apiReliability";
 import { clearDashboardSnapshot, dashboardCacheRetentionToMs, getDashboardCacheRetentionMinutes, isDashboardSnapshotExpired, loadDashboardSnapshot, setDashboardCacheRetentionMinutes, writeDashboardSnapshot, type DashboardSnapshot } from "@/lib/dashboardCache";
-import { formatGuidedDemoDuration, getGuidedDemoProgress, getUndispatchedGuidedScenario, guidedDemoSteps } from "@/lib/guidedDemo";
+import { formatGuidedDemoDuration, getGuidedDemoProgress, getGuidedReplayContrastState, getUndispatchedGuidedScenario, guidedDemoSteps, type GuidedDemoStatus } from "@/lib/guidedDemo";
 import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Clock3, Cpu, Database, FileCheck2, Fingerprint, Gauge, KeyRound, ListVideo, LockKeyhole, Pause, Play, RefreshCw, RotateCcw, ScanLine, ShieldCheck, SkipForward, SlidersHorizontal, Sparkles, TimerReset, TriangleAlert, WifiOff, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
@@ -26,7 +26,6 @@ const formatSnapshotAge = (value?: number) => {
 };
 type ScenarioName = (typeof scenarios)[number]["label"];
 type ScenarioAttempt = { scenario: ScenarioName; idempotencyKey: string };
-type GuidedDemoStatus = "idle" | "running" | "paused" | "complete";
 
 function createScenarioAttempt(scenario: ScenarioName): ScenarioAttempt {
   const idempotencyKey = typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -272,8 +271,17 @@ function GuidedDemoPanel({ prompt,onPromptChange,status,stepIndex,step,canStart,
   const playing = status === "running";
   const canControl = status === "running" || status === "paused";
   const progress = getGuidedDemoProgress(stepIndex, status);
+  const replayContrast = getGuidedReplayContrastState(stepIndex, status);
+  const replayCopy = {
+    waiting: "Stage 02 grants one fresh capability. Stage 07 tries to use that authority again.",
+    "fresh-execution": "Fresh capability accepted once. The protected action commits exactly one change.",
+    "protected-once": "The valid action is complete and its capability is now consumed. The replay test is next.",
+    "replay-refused": "The same spent authority is presented again. Gateway verification refuses it before any second change.",
+    complete: "Contrast complete: one protected execution, one replay refusal, and no duplicate side effect.",
+  }[replayContrast];
   return <aside className={`guided-demo guided-demo-${status}`} aria-labelledby="guided-demo-title"><div className="guided-demo-head"><div><span className="eyebrow"><Sparkles className="h-3.5 w-3.5" />Judge walkthrough</span><h3 id="guided-demo-title">A guided authority story, backed by the live system.</h3><p>One button runs the same persisted scenarios a judge can inspect. The plan is paced for <b>{formatGuidedDemoDuration()}</b>; controls remain available if you need to pause, skip, or restart.</p></div><div className="guided-demo-status"><ListVideo className="h-4 w-4" /><span>{status === "idle" ? "ready" : status === "complete" ? "proof ready" : `stage ${String(stepIndex + 1).padStart(2, "0")} / ${String(guidedDemoSteps.length).padStart(2, "0")}`}</span></div></div>
     <div className="guided-progress"><div><span>Workflow progress</span><b>{progress}% · Step {status === "complete" ? guidedDemoSteps.length : stepIndex + 1} of {guidedDemoSteps.length}</b></div><div className="guided-progress-track" role="progressbar" aria-label="Guided demo workflow progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><span style={{ width: `${progress}%` }} /></div></div><div className="guided-demo-grid"><div className="guided-prompt"><label htmlFor="judge-demo-prompt">Judge narrative</label><textarea id="judge-demo-prompt" value={prompt} maxLength={220} onChange={event => onPromptChange(event.target.value)} aria-describedby="judge-demo-note" /><small id="judge-demo-note">This frames the narration. Sentra’s policy outcomes remain deterministic and server-persisted.</small></div><div className="guided-now" aria-live="polite"><span>Now demonstrating</span><b>{step.title}</b><p>{step.narration}</p><small>{step.evidence}</small></div></div>
+    <div className={`guided-replay-contrast contrast-${replayContrast}`} aria-live="polite"><div className="contrast-head"><span>One capability. One execution.</span><b>Fresh request ≠ replayed request</b></div><div className="contrast-cards"><article className="contrast-card contrast-valid"><span>Fresh request</span><b>{replayContrast === "waiting" ? "Awaiting capability" : "ALLOW · executed once"}</b><small>{replayContrast === "waiting" ? "Scoped request has not crossed the gateway." : "Capability verified, then marked consumed."}</small></article><ArrowRight className="contrast-arrow h-4 w-4" /><article className="contrast-card contrast-replay"><span>Replayed request</span><b>{replayContrast === "replay-refused" || replayContrast === "complete" ? "DENY · no second change" : "Replay test pending"}</b><small>{replayContrast === "replay-refused" || replayContrast === "complete" ? "Consumed capability rejected at gateway." : "The same spent authority will be tested at stage 07."}</small></article></div><p>{replayCopy}</p></div>
     <div className="guided-demo-controls"><button type="button" className="guided-start" disabled={!canStart || isBusy} onClick={onStart}><Play className="h-4 w-4" />{status === "idle" || status === "complete" ? "Start guided demo" : "Restart from baseline"}</button>{playing ? <button type="button" className="guided-control" onClick={onPause}><Pause className="h-4 w-4" />Pause</button> : status === "paused" ? <button type="button" className="guided-control" disabled={!canStart} onClick={onResume}><Play className="h-4 w-4" />Resume</button> : null}{canControl ? <button type="button" className="guided-control" onClick={onSkip}><SkipForward className="h-4 w-4" />Skip stage</button> : null}<button type="button" className="guided-control" onClick={onReset}><RotateCcw className="h-4 w-4" />Reset tour</button></div>
     <ol className="guided-steps">{guidedDemoSteps.map((item,index) => <li key={item.title} className={index === stepIndex ? "guided-current" : index < stepIndex ? "guided-complete" : ""}><span>{String(index + 1).padStart(2, "0")}</span><b>{item.title}</b>{item.scenario ? <small>{item.scenario}</small> : <small>context</small>}</li>)}</ol>
   </aside>;

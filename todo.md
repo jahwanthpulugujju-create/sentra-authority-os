@@ -99,4 +99,7 @@
 - [x] Deliver the audited ranking and an explicit plan for a later independent re-evaluation from abstracts.
 - [x] Define an evidence-based 45-plus target across the five supplied Sentra scoring criteria without claiming a guaranteed outcome.
 - [x] Produce the prioritized implementation, demo, proof, and validation checklist required to support that target.
-- [ ] Deliver the structured 45-plus Sentra readiness roadmap with explicit assumptions and remaining judge-risk limits.
+- [x] Deliver the structured 45-plus Sentra readiness roadmap with explicit assumptions and remaining judge-risk limits.
+- [x] Add an explicit valid-versus-replayed-request comparison state to the guided judge workflow.
+- [x] Make capability freshness, single consumption, protected execution, and replay refusal visually distinguishable in that contrast.
+- [x] Validate the updated workflow, responsive UI, automated checks, and six-scenario proof baseline before delivery.
