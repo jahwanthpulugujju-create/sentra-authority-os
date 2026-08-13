@@ -34,5 +34,5 @@
 - [x] Build a purposeful interactive authority artifact with light-mode depth, kinetic behavior, and no generic AI dashboard motifs.
 - [x] Redesign the live authority controls, proof-chain inspection, architecture, and progress content with stronger visual storytelling.
 - [x] Validate the redesign on desktop and mobile, test all live scenarios, and save the redesigned project checkpoint.
-- [ ] Save and verify a post-redesign project checkpoint for the premium light-mode experience.
-- [ ] Perform a final desktop and mobile smoke pass against the saved redesign state.
+- [x] Save and verify a post-redesign project checkpoint for the premium light-mode experience.
+- [x] Perform a final desktop and mobile smoke pass against the saved redesign state.
