@@ -43,5 +43,5 @@
 - [x] Add interactive capability-artifact response and scenario-to-verdict transition feedback without altering the server authority rules.
 - [x] Add purposeful live proof-chain and system-map motion that explains request-to-proof flow in light mode.
 - [x] Validate motion interactions on desktop and mobile, retest live scenarios, and save the interactive refinement checkpoint.
-- [ ] Save and verify the post-motion interactive refinement checkpoint.
-- [ ] Run a final desktop and mobile smoke pass plus all six authority scenarios against the saved motion state.
+- [x] Save and verify the post-motion interactive refinement checkpoint.
+- [x] Run a final desktop and mobile smoke pass plus all six authority scenarios against the saved motion state.
