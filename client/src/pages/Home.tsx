@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
+import { isTransientNetworkError } from "@/lib/apiReliability";
 import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Cpu, Database, FileCheck2, Fingerprint, KeyRound, LockKeyhole, ScanLine, ShieldCheck, TimerReset, TriangleAlert, Zap } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
 const scenarios = [
@@ -18,21 +19,22 @@ const formatTime = (value?: string | Date) => value ? new Date(value).toLocaleTi
 
 export default function Home() {
   const utils = trpc.useUtils();
-  const dashboard = trpc.authority.dashboard.useQuery(undefined, { refetchInterval: 3500 });
-  const refreshContext = trpc.authority.refreshContext.useMutation({ onSuccess: () => utils.authority.dashboard.invalidate() });
+  const dashboard = trpc.authority.dashboard.useQuery(undefined, { refetchInterval: 3500, placeholderData: previousData => previousData });
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [artifactPointer, setArtifactPointer] = useState({ x: 0, y: 0 });
   const resetDemo = trpc.authority.resetDemo.useMutation({
     onSuccess: () => { setActiveScenario(null); utils.authority.dashboard.invalidate(); toast.success("Demo reset: protected state and proof history are back to baseline."); },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(isTransientNetworkError(error) ? "Connection interrupted. Reset was not confirmed; wait for Sentra to reconnect." : error.message),
   });
   const runScenario = trpc.authority.runScenario.useMutation({
     onSuccess: data => { utils.authority.dashboard.invalidate(); setActiveScenario(data.event.scenario); toast.success(`${data.event.outcome}: ${data.event.executionResult}`); },
-    onError: error => { setActiveScenario(null); toast.error(error.message); },
+    onError: error => { setActiveScenario(null); toast.error(isTransientNetworkError(error) ? "Connection interrupted. The browser did not receive a confirmed decision; check the ledger before retrying." : error.message); },
   });
-  useEffect(() => { const id = window.setInterval(() => refreshContext.mutate(), 7000); return () => window.clearInterval(id); }, [refreshContext]);
 
   const data = dashboard.data;
+  const apiUnavailable = dashboard.isError;
+  const apiReady = Boolean(data) && !apiUnavailable;
+  const connectionLabel = apiUnavailable ? "reconnecting" : dashboard.isFetching && !data ? "connecting" : "connected";
   const resource = data?.resource;
   const events = data?.events || [];
   const latest = events[0];
@@ -54,7 +56,7 @@ export default function Home() {
     <header className="site-header"><div className="site-header-inner">
       <a href="#top" className="brand-lockup"><img src="/manus-storage/sentra-logo_24a70887.png" className="brand-mark" alt="Sentra logo" /><div><p>Sentra</p><span>Authority OS</span></div></a>
       <nav className="site-nav"><a href="#demo">Demo</a><a href="#proof">Evidence</a><a href="#architecture">System</a><a href="#progress">MVP</a></nav>
-      <div className="system-online"><span className="status-dot pulse" />Live authority</div>
+      <div className="system-online"><span className="status-dot pulse" />{apiUnavailable ? "Reconnecting" : "Live authority"}</div>
     </div></header>
 
     <main id="top">
@@ -75,12 +77,12 @@ export default function Home() {
       </div></section>
 
       <section id="demo" className="content-section demo-section"><SectionHeading eyebrow="Live system demonstration" title="Ask the boundary a question." description="Each control calls the real authority API. Sentra persists the canonical request, evaluates policy, issues a capability only when valid, and changes protected state only after gateway verification." />
-        <div className="demo-layout"><div className="demo-rail"><div className="rail-head"><div><span className="eyebrow">A single protected path</span><h3>Proposal is not permission.</h3></div><span className="connected-state"><span className="status-dot" />connected</span></div>
+        <div className="demo-layout"><div className="demo-rail"><div className="rail-head"><div><span className="eyebrow">A single protected path</span><h3>Proposal is not permission.</h3></div><span className="connected-state"><span className="status-dot" />{connectionLabel}</span></div>
           <div className="path-map"><PathStep number="01" icon={Cpu} title="Procurement agent" detail="submits a proposal" /><PathStep number="02" icon={ShieldCheck} title="Sentra policy kernel" detail="returns a bounded decision" tone="brand" /><PathStep number="03" icon={FileCheck2} title="Vendor approval tool" detail={active ? "state changed after ALLOW" : "held until verified"} tone={active ? "green" : "neutral"} /></div>
           <div className="rule-notice"><LockKeyhole className="h-4 w-4" /><span>The workspace state is server-held. It changes only after a valid <b>ALLOW</b> and gateway check.</span></div>
-        </div><div className="scenario-console"><div className="console-head"><div><span className="eyebrow">Authority test suite</span><h3>Choose a scenario.</h3></div><div className="console-controls"><span className="console-status">live database</span><button type="button" className="demo-reset" disabled={runScenario.isPending || resetDemo.isPending} onClick={() => resetDemo.mutate()}><TimerReset className="h-3.5 w-3.5" />Reset baseline</button></div></div>
-          <div className="scenario-grid">{scenarios.map(({ label, icon: Icon, note, tone }, index) => <button key={label} type="button" disabled={runScenario.isPending} onClick={() => { setActiveScenario(label); runScenario.mutate({ scenario: label }); }} className={`scenario-button scenario-${tone} ${activeScenario === label ? "scenario-active" : ""}`}><span className="scenario-index">0{index + 1}</span><span className="scenario-icon"><Icon className="h-4 w-4" /></span><span className="scenario-content"><b>{label}</b><small>{note}</small></span><ChevronRight className="h-4 w-4 scenario-arrow" /></button>)}</div>
-          <div className="decision-strip" aria-live="polite"><span>Latest verdict</span>{latest ? <><OutcomeBadge outcome={latest.outcome} /><p>{latest.gatewayResult}</p></> : <p>Select a test to create a persisted decision.</p>}</div>
+        </div><div className="scenario-console"><div className="console-head"><div><span className="eyebrow">Authority test suite</span><h3>Choose a scenario.</h3></div><div className="console-controls"><span className="console-status">{apiUnavailable ? "reconnecting" : "live database"}</span><button type="button" className="demo-reset" disabled={runScenario.isPending || resetDemo.isPending || !apiReady} onClick={() => resetDemo.mutate()}><TimerReset className="h-3.5 w-3.5" />Reset baseline</button></div></div>
+          <div className="scenario-grid">{scenarios.map(({ label, icon: Icon, note, tone }, index) => <button key={label} type="button" disabled={runScenario.isPending || !apiReady} onClick={() => { setActiveScenario(label); runScenario.mutate({ scenario: label }); }} className={`scenario-button scenario-${tone} ${activeScenario === label ? "scenario-active" : ""}`}><span className="scenario-index">0{index + 1}</span><span className="scenario-icon"><Icon className="h-4 w-4" /></span><span className="scenario-content"><b>{label}</b><small>{note}</small></span><ChevronRight className="h-4 w-4 scenario-arrow" /></button>)}</div>
+          <div className="decision-strip" aria-live="polite"><span>Latest verdict</span>{apiUnavailable ? <p>Connection is recovering. Scenario controls remain locked until Sentra reconnects.</p> : latest ? <><OutcomeBadge outcome={latest.outcome} /><p>{latest.gatewayResult}</p></> : <p>Select a test to create a persisted decision.</p>}</div>
         </div></div>
       </section>
 

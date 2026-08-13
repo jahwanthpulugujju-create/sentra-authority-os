@@ -6,9 +6,20 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
+import { isTransientNetworkError } from "./lib/apiReliability";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Dashboard reads are safe to retry when the preview tunnel or a browser
+      // connection briefly drops. Mutations remain non-retried by default.
+      retry: (failureCount, error) => isTransientNetworkError(error) ? failureCount < 4 : failureCount < 1,
+      retryDelay: attemptIndex => Math.min(750 * 2 ** attemptIndex, 6000),
+      refetchOnWindowFocus: true,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -25,6 +36,7 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
+    if (isTransientNetworkError(error)) return;
     console.error("[API Query Error]", error);
   }
 });
@@ -33,6 +45,7 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
+    if (isTransientNetworkError(error)) return;
     console.error("[API Mutation Error]", error);
   }
 });

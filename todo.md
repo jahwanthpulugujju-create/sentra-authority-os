@@ -65,3 +65,5 @@
 - [x] Implement the highest-impact frontend evidence, reset, demo-safety, repository, and review-documentation gaps found by the audit.
 - [x] Run automated tests, adversarial checks, production build, and responsive review on the upgraded implementation.
 - [x] Deliver an honest professional readiness report and a 100-day team operating plan with human validation gates.
+- [x] Diagnose and repair browser-to-tRPC fetch failures affecting the dashboard query and scenario mutations.
+- [x] Validate the repaired API transport through browser interaction, automated checks, and the repeatable Sentra verifier.
