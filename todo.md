@@ -89,3 +89,14 @@
 - [x] Add focused unit coverage that proves a reduced user-selected retention value expires an older saved snapshot immediately.
 - [x] Verify in-browser that an older saved snapshot remains available offline under a longer selected retention duration.
 - [x] Verify in-browser that reducing the configured retention removes an older saved snapshot, displays the expired-cache state, and deletes local storage.
+- [x] Configure the Sentra repository’s Git author attribution as Jahwanth for new synchronization commits.
+- [x] Commit and push the current Sentra enhancements to the configured GitHub repository under the requested author identity.
+- [x] Restore and verify the active Sentra dashboard’s live online connection state.
+- [x] Reattribute all existing Sentra commits in private Git history to Jahwanth and verify the rewritten GitHub main branch.
+- [x] Audit the supplied workbook’s exact five-criterion rubric, formulas, totals, ranks, and tie handling without replacing its scores.
+- [x] Map all 151 supplied source files to unique concepts and duplicate-source links, retaining workbook scores as supplied evidence.
+- [x] Rebuild an auditable all-source ranking view and position the updated Sentra against that workbook-only framework with uncertainty labels.
+- [x] Deliver the audited ranking and an explicit plan for a later independent re-evaluation from abstracts.
+- [x] Define an evidence-based 45-plus target across the five supplied Sentra scoring criteria without claiming a guaranteed outcome.
+- [x] Produce the prioritized implementation, demo, proof, and validation checklist required to support that target.
+- [ ] Deliver the structured 45-plus Sentra readiness roadmap with explicit assumptions and remaining judge-risk limits.
