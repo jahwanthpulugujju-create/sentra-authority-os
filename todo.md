@@ -27,5 +27,12 @@
 - [x] Add a GitHub-ready README and dedicated progress update for the software-only Sentra MVP.
 - [x] Update the live scenario rules and tests to prove protected software execution changes only after ALLOW.
 - [x] Create and push the private GitHub repository for the Round 2 submission.
+- [x] Research and classify the user-provided reference websites without changing the restored original Sentra dashboard.
+- [x] Produce a reference-to-Sentra design mapping that identifies only transferable patterns and explicit exclusions.
+- [x] Obtain approval of the reference-informed direction before changing the restored dashboard visuals.
+- [x] Define the approved light-mode visual system using reference-derived hierarchy, clarity, and progressive proof disclosure.
+- [x] Rebuild the original Sentra hero and live authority demo around one clear judge action and a visible system artifact.
+- [x] Refine proof-chain, architecture, progress, and responsive interaction surfaces without changing enforcement behavior.
+- [ ] Re-test all live authority scenarios, verify desktop and mobile views, and save the approved reference-informed redesign checkpoint.
 - [ ] Save and verify the final web project checkpoint identifier.
 - [ ] Create, push, and verify a private GitHub repository URL containing the final Round 2 code.
