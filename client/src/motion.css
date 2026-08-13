@@ -1,0 +1,63 @@
+@media (prefers-reduced-motion: no-preference) {
+  .hero-stage::after {
+    content: "";
+    position: absolute;
+    width: 22rem;
+    height: 22rem;
+    right: -7rem;
+    top: 8rem;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(178,36,86,.08), transparent 66%);
+    filter: blur(10px);
+    animation: sentra-ambient 10s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  .authority-artifact {
+    transform: perspective(1100px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+    transform-style: preserve-3d;
+    transition: transform 220ms cubic-bezier(.23,1,.32,1), box-shadow 220ms ease;
+  }
+
+  .authority-artifact:hover { box-shadow: 0 38px 76px rgba(32,50,86,.19); }
+  .artifact-core { transform: translate(-50%,-50%) translate3d(var(--pointer-x),var(--pointer-y),20px); animation: sentra-core 3.4s ease-in-out infinite; }
+  .artifact-orbit { animation: sentra-orbit 18s linear infinite; }
+  .orbit-b { animation-direction: reverse; animation-duration: 27s; }
+  .artifact-node { transform: translate3d(var(--pointer-x),var(--pointer-y),28px); transition: transform 220ms cubic-bezier(.23,1,.32,1), box-shadow 220ms ease; }
+  .artifact-outcome { transform: translate3d(var(--pointer-x),var(--pointer-y),34px); transition: transform 220ms cubic-bezier(.23,1,.32,1), box-shadow 220ms ease; }
+  .authority-artifact:hover .artifact-node, .authority-artifact:hover .artifact-outcome { box-shadow: 0 16px 34px rgba(32,50,86,.14); }
+  .outcome-state-ALLOW .artifact-core { border-color: rgba(25,112,74,.32); }
+  .outcome-state-DENY .artifact-core { border-color: rgba(178,47,67,.32); }
+  .outcome-state-ESCALATE .artifact-core { border-color: rgba(168,98,17,.32); }
+  .outcome-state-FREEZE .artifact-core { border-color: rgba(38,94,199,.34); }
+
+  .scenario-button { overflow: hidden; }
+  .scenario-button::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: currentColor; opacity: 0; transform: scaleX(.18); transform-origin: left; transition: opacity 160ms ease, transform 230ms cubic-bezier(.23,1,.32,1); }
+  .scenario-button:hover::after, .scenario-button.scenario-active::after { opacity: .72; transform: scaleX(1); }
+  .scenario-button.scenario-active { animation: sentra-verdict 520ms cubic-bezier(.23,1,.32,1); border-color: rgba(155,23,71,.42); }
+  .scenario-button.scenario-active .scenario-icon { animation: sentra-icon 560ms cubic-bezier(.23,1,.32,1); }
+  .decision-strip { transition: transform 180ms cubic-bezier(.23,1,.32,1), box-shadow 180ms ease; }
+  .scenario-console:has(.scenario-active) .decision-strip { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(32,50,86,.08); }
+
+  .proof-row { transition: transform 180ms cubic-bezier(.23,1,.32,1), background 180ms ease; }
+  .proof-row:hover { transform: translateX(5px); background: linear-gradient(90deg, rgba(236,243,255,.72), transparent); }
+  .proof-row:hover .proof-dot { transform: scale(1.25); box-shadow: 0 0 0 5px rgba(155,23,71,.08); }
+  .proof-dot { transition: transform 180ms cubic-bezier(.23,1,.32,1), box-shadow 180ms ease; }
+  .payload-block[open] { animation: sentra-unfold 230ms cubic-bezier(.23,1,.32,1); }
+  .flow-item { animation: sentra-flow 620ms cubic-bezier(.23,1,.32,1) both; }
+  .flow-item:nth-child(2){animation-delay:60ms}.flow-item:nth-child(3){animation-delay:120ms}.flow-item:nth-child(4){animation-delay:180ms}.flow-item:nth-child(5){animation-delay:240ms}.flow-item:nth-child(6){animation-delay:300ms}.flow-item:nth-child(7){animation-delay:360ms}
+  .plane-card { transition: transform 180ms cubic-bezier(.23,1,.32,1), box-shadow 180ms ease, border-color 180ms ease; }
+  .plane-card:hover { border-color: rgba(155,23,71,.28); }
+}
+
+@keyframes sentra-ambient { to { transform: translate3d(-2rem,1rem,0) scale(1.16); } }
+@keyframes sentra-core { 50% { box-shadow: 0 22px 38px rgba(38,94,199,.22); } }
+@keyframes sentra-orbit { to { transform: translate(-50%,-50%) rotate(360deg); } }
+@keyframes sentra-verdict { 0% { transform: scale(.98); } 45% { transform: scale(1.018); } 100% { transform: scale(1); } }
+@keyframes sentra-icon { 50% { transform: rotate(-8deg) scale(1.12); } }
+@keyframes sentra-unfold { from { opacity: .4; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sentra-flow { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .authority-artifact, .artifact-core, .artifact-node, .artifact-outcome { transform: none !important; }
+}

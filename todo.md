@@ -39,3 +39,9 @@
 - [x] Audit and remove every dark panel, dark canvas, and dark-system treatment from the Sentra interface.
 - [x] Rebuild evidence, request, and system-map surfaces using premium light-mode materials and high-contrast readable text.
 - [x] Revalidate light-mode desktop and mobile layouts and ensure all live authority scenarios remain intact.
+- [x] Define and apply a motion system for authority state changes, pointer depth, and proof progression with reduced-motion support.
+- [x] Add interactive capability-artifact response and scenario-to-verdict transition feedback without altering the server authority rules.
+- [x] Add purposeful live proof-chain and system-map motion that explains request-to-proof flow in light mode.
+- [x] Validate motion interactions on desktop and mobile, retest live scenarios, and save the interactive refinement checkpoint.
+- [ ] Save and verify the post-motion interactive refinement checkpoint.
+- [ ] Run a final desktop and mobile smoke pass plus all six authority scenarios against the saved motion state.

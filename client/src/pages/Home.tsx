@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Cpu, Database, FileCheck2, Fingerprint, KeyRound, LockKeyhole, ScanLine, ShieldCheck, TimerReset, TriangleAlert, Zap } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
 const scenarios = [
@@ -20,9 +20,11 @@ export default function Home() {
   const utils = trpc.useUtils();
   const dashboard = trpc.authority.dashboard.useQuery(undefined, { refetchInterval: 3500 });
   const refreshContext = trpc.authority.refreshContext.useMutation({ onSuccess: () => utils.authority.dashboard.invalidate() });
+  const [activeScenario, setActiveScenario] = useState<string | null>(null);
+  const [artifactPointer, setArtifactPointer] = useState({ x: 0, y: 0 });
   const runScenario = trpc.authority.runScenario.useMutation({
-    onSuccess: data => { utils.authority.dashboard.invalidate(); toast.success(`${data.event.outcome}: ${data.event.executionResult}`); },
-    onError: error => toast.error(error.message),
+    onSuccess: data => { utils.authority.dashboard.invalidate(); setActiveScenario(data.event.scenario); toast.success(`${data.event.outcome}: ${data.event.executionResult}`); },
+    onError: error => { setActiveScenario(null); toast.error(error.message); },
   });
   useEffect(() => { const id = window.setInterval(() => refreshContext.mutate(), 7000); return () => window.clearInterval(id); }, [refreshContext]);
 
@@ -33,6 +35,16 @@ export default function Home() {
   const active = Boolean(resource?.executionState);
   const metrics = data?.metrics || { protectedResources: 0, totalEvents: 0, blockedEvents: 0 };
   const allowed = useMemo(() => events.filter(event => event.outcome === "ALLOW").length, [events]);
+  const artifactStyle = {
+    "--pointer-x": `${artifactPointer.x * 12}px`,
+    "--pointer-y": `${artifactPointer.y * 12}px`,
+    "--tilt-x": `${artifactPointer.y * -3}deg`,
+    "--tilt-y": `${artifactPointer.x * 3}deg`,
+  } as CSSProperties;
+  const handleArtifactMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setArtifactPointer({ x: (event.clientX - rect.left) / rect.width - 0.5, y: (event.clientY - rect.top) / rect.height - 0.5 });
+  };
 
   return <div className="sentra-shell">
     <header className="site-header"><div className="site-header-inner">
@@ -49,7 +61,7 @@ export default function Home() {
           <div className="hero-actions"><a href="#demo" className="button-primary">Run a boundary test <ArrowDownRight className="h-4 w-4" /></a><a href="#proof" className="button-secondary">Trace the evidence <Fingerprint className="h-4 w-4" /></a></div>
           <div className="metric-ribbon"><HeroMetric value={String(metrics.protectedResources).padStart(2, "0")} label="Protected tools" /><HeroMetric value={String(metrics.totalEvents).padStart(2, "0")} label="Proof records" /><HeroMetric value={String(metrics.blockedEvents).padStart(2, "0")} label="Refused paths" /></div>
         </div>
-        <div className="authority-artifact reveal" style={{ animationDelay: "100ms" }}>
+        <div className={`authority-artifact reveal outcome-state-${latest?.outcome || "READY"}`} style={{ ...artifactStyle, animationDelay: "100ms" }} onMouseMove={handleArtifactMove} onMouseLeave={() => setArtifactPointer({ x: 0, y: 0 })}>
           <div className="artifact-topline"><span className="eyebrow">Live authorization</span><span className="artifact-time">server persisted</span></div><div className="artifact-orbit orbit-a" /><div className="artifact-orbit orbit-b" />
           <div className="artifact-core"><div className="core-icon"><ShieldCheck className="h-7 w-7" /></div><p>Current authority</p><strong>{latest?.outcome || "READY"}</strong><span>{latest ? outcomeCopy[latest.outcome] : "Awaiting an agent request"}</span></div>
           <ArtifactNode className="node-agent" number="01" icon={Cpu} title="Agent" detail="proposes" /><ArtifactNode className="node-policy" number="02" icon={ScanLine} title="Policy" detail="decides" /><ArtifactNode className="node-gateway" number="03" icon={KeyRound} title="Gateway" detail="verifies" />
@@ -63,8 +75,8 @@ export default function Home() {
           <div className="path-map"><PathStep number="01" icon={Cpu} title="Procurement agent" detail="submits a proposal" /><PathStep number="02" icon={ShieldCheck} title="Sentra policy kernel" detail="returns a bounded decision" tone="brand" /><PathStep number="03" icon={FileCheck2} title="Vendor approval tool" detail={active ? "state changed after ALLOW" : "held until verified"} tone={active ? "green" : "neutral"} /></div>
           <div className="rule-notice"><LockKeyhole className="h-4 w-4" /><span>The workspace state is server-held. It changes only after a valid <b>ALLOW</b> and gateway check.</span></div>
         </div><div className="scenario-console"><div className="console-head"><div><span className="eyebrow">Authority test suite</span><h3>Choose a scenario.</h3></div><span className="console-status">live database</span></div>
-          <div className="scenario-grid">{scenarios.map(({ label, icon: Icon, note, tone }, index) => <button key={label} type="button" disabled={runScenario.isPending} onClick={() => runScenario.mutate({ scenario: label })} className={`scenario-button scenario-${tone}`}><span className="scenario-index">0{index + 1}</span><span className="scenario-icon"><Icon className="h-4 w-4" /></span><span className="scenario-content"><b>{label}</b><small>{note}</small></span><ChevronRight className="h-4 w-4 scenario-arrow" /></button>)}</div>
-          <div className="decision-strip"><span>Latest verdict</span>{latest ? <><OutcomeBadge outcome={latest.outcome} /><p>{latest.gatewayResult}</p></> : <p>Select a test to create a persisted decision.</p>}</div>
+          <div className="scenario-grid">{scenarios.map(({ label, icon: Icon, note, tone }, index) => <button key={label} type="button" disabled={runScenario.isPending} onClick={() => { setActiveScenario(label); runScenario.mutate({ scenario: label }); }} className={`scenario-button scenario-${tone} ${activeScenario === label ? "scenario-active" : ""}`}><span className="scenario-index">0{index + 1}</span><span className="scenario-icon"><Icon className="h-4 w-4" /></span><span className="scenario-content"><b>{label}</b><small>{note}</small></span><ChevronRight className="h-4 w-4 scenario-arrow" /></button>)}</div>
+          <div className="decision-strip" aria-live="polite"><span>Latest verdict</span>{latest ? <><OutcomeBadge outcome={latest.outcome} /><p>{latest.gatewayResult}</p></> : <p>Select a test to create a persisted decision.</p>}</div>
         </div></div>
       </section>
 
