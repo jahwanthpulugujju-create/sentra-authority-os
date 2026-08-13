@@ -1,7 +1,8 @@
 import { trpc } from "@/lib/trpc";
 import { isTransientNetworkError } from "@/lib/apiReliability";
 import { clearDashboardSnapshot, readDashboardSnapshot, writeDashboardSnapshot, type DashboardSnapshot } from "@/lib/dashboardCache";
-import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Clock3, Cpu, Database, FileCheck2, Fingerprint, KeyRound, LockKeyhole, RefreshCw, ScanLine, ShieldCheck, TimerReset, TriangleAlert, WifiOff, X, Zap } from "lucide-react";
+import { formatGuidedDemoDuration, getUndispatchedGuidedScenario, guidedDemoSteps } from "@/lib/guidedDemo";
+import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Clock3, Cpu, Database, FileCheck2, Fingerprint, KeyRound, ListVideo, LockKeyhole, Pause, Play, RefreshCw, RotateCcw, ScanLine, ShieldCheck, SkipForward, Sparkles, TimerReset, TriangleAlert, WifiOff, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
@@ -20,6 +21,7 @@ const formatTime = (value?: string | Date) => value ? new Date(value).toLocaleTi
 const formatRefreshTime = (value?: number) => value ? new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "No live dashboard saved";
 type ScenarioName = (typeof scenarios)[number]["label"];
 type ScenarioAttempt = { scenario: ScenarioName; idempotencyKey: string };
+type GuidedDemoStatus = "idle" | "running" | "paused" | "complete";
 
 function createScenarioAttempt(scenario: ScenarioName): ScenarioAttempt {
   const idempotencyKey = typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -52,8 +54,12 @@ export default function Home() {
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [lastFailedScenario, setLastFailedScenario] = useState<ScenarioAttempt | null>(null);
   const [artifactPointer, setArtifactPointer] = useState({ x: 0, y: 0 });
+  const [guidedDemoStatus, setGuidedDemoStatus] = useState<GuidedDemoStatus>("idle");
+  const [guidedDemoIndex, setGuidedDemoIndex] = useState(0);
+  const [guidedPrompt, setGuidedPrompt] = useState("Approve Contoso as a scoped vendor — then show me why every unsafe shortcut is refused.");
   const browserOnline = useBrowserOnline();
   const reconnectAfterRef = useRef<number | null>(null);
+  const guidedExecutedStepsRef = useRef(new Set<number>());
   useEffect(() => {
     if (!dashboard.data) return;
     const savedAt = dashboard.dataUpdatedAt || Date.now();
@@ -93,6 +99,47 @@ export default function Home() {
     if (!dashboard.data) setLastLiveRefreshAt(undefined);
     toast.success("Saved offline dashboard data cleared.");
   };
+  const guidedStep = guidedDemoSteps[guidedDemoIndex];
+  const beginGuidedDemo = async () => {
+    if (!apiReady || resetDemo.isPending || runScenario.isPending) {
+      toast.error("The guided walkthrough needs a live authority connection before it can begin.");
+      return;
+    }
+    setGuidedDemoStatus("paused");
+    setGuidedDemoIndex(0);
+    guidedExecutedStepsRef.current.clear();
+    setLastFailedScenario(null);
+    await resetDemo.mutateAsync();
+    setGuidedDemoStatus("running");
+    toast.success("Judge walkthrough started. Sentra will progress through its real scenario suite.");
+  };
+  const skipGuidedStep = () => {
+    if (guidedDemoStatus === "idle" || guidedDemoStatus === "complete") return;
+    if (guidedDemoIndex >= guidedDemoSteps.length - 1) { setGuidedDemoStatus("complete"); return; }
+    setGuidedDemoIndex(index => index + 1);
+  };
+  const resetGuidedDemo = () => {
+    setGuidedDemoStatus("idle");
+    setGuidedDemoIndex(0);
+  };
+  useEffect(() => {
+    if (guidedDemoStatus !== "running") return;
+    const step = guidedDemoSteps[guidedDemoIndex];
+    const undispatchedScenario = getUndispatchedGuidedScenario(guidedDemoIndex, guidedExecutedStepsRef.current);
+    if (undispatchedScenario) {
+      guidedExecutedStepsRef.current.add(guidedDemoIndex);
+      setActiveScenario(undispatchedScenario);
+      void runScenario.mutateAsync(createScenarioAttempt(undispatchedScenario)).catch(() => {
+        guidedExecutedStepsRef.current.delete(guidedDemoIndex);
+        setGuidedDemoStatus("paused");
+      });
+    }
+    const timer = window.setTimeout(() => {
+      if (guidedDemoIndex >= guidedDemoSteps.length - 1) setGuidedDemoStatus("complete");
+      else setGuidedDemoIndex(index => index + 1);
+    }, step.durationMs);
+    return () => window.clearTimeout(timer);
+  }, [guidedDemoStatus, guidedDemoIndex]);
   const resource = data?.resource;
   const events = data?.events || [];
   const latest = events[0];
@@ -136,6 +183,7 @@ export default function Home() {
       </div></section>
 
       <section id="demo" className="content-section demo-section"><SectionHeading eyebrow="Live system demonstration" title="Ask the boundary a question." description="Each control calls the real authority API. Sentra persists the canonical request, evaluates policy, issues a capability only when valid, and changes protected state only after gateway verification." />
+        <GuidedDemoPanel prompt={guidedPrompt} onPromptChange={setGuidedPrompt} status={guidedDemoStatus} stepIndex={guidedDemoIndex} step={guidedStep} canStart={apiReady && !resetDemo.isPending && !runScenario.isPending} isBusy={resetDemo.isPending || runScenario.isPending} onStart={() => void beginGuidedDemo()} onPause={() => setGuidedDemoStatus("paused")} onResume={() => setGuidedDemoStatus("running")} onSkip={skipGuidedStep} onReset={resetGuidedDemo} />
         <div className="demo-layout"><div className="demo-rail"><div className="rail-head"><div><span className="eyebrow">A single protected path</span><h3>Proposal is not permission.</h3></div><span className={`connected-state ${apiUnavailable ? "connection-offline" : ""}`}><span className="status-dot" />{connectionLabel}</span></div>
           <div className="path-map"><PathStep number="01" icon={Cpu} title="Procurement agent" detail="submits a proposal" /><PathStep number="02" icon={ShieldCheck} title="Sentra policy kernel" detail="returns a bounded decision" tone="brand" /><PathStep number="03" icon={FileCheck2} title="Vendor approval tool" detail={active ? "state changed after ALLOW" : "held until verified"} tone={active ? "green" : "neutral"} /></div>
           <div className="rule-notice"><LockKeyhole className="h-4 w-4" /><span>The workspace state is server-held. It changes only after a valid <b>ALLOW</b> and gateway check.</span></div>
@@ -172,6 +220,15 @@ export default function Home() {
 }
 
 function SectionHeading({ eyebrow, title, description }: { eyebrow:string; title:string; description:string }) { return <div className="section-heading"><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{description}</p></div>; }
+function GuidedDemoPanel({ prompt,onPromptChange,status,stepIndex,step,canStart,isBusy,onStart,onPause,onResume,onSkip,onReset }: { prompt:string; onPromptChange:(value:string)=>void; status:GuidedDemoStatus; stepIndex:number; step:typeof guidedDemoSteps[number]; canStart:boolean; isBusy:boolean; onStart:()=>void; onPause:()=>void; onResume:()=>void; onSkip:()=>void; onReset:()=>void }) {
+  const playing = status === "running";
+  const canControl = status === "running" || status === "paused";
+  return <aside className={`guided-demo guided-demo-${status}`} aria-labelledby="guided-demo-title"><div className="guided-demo-head"><div><span className="eyebrow"><Sparkles className="h-3.5 w-3.5" />Judge walkthrough</span><h3 id="guided-demo-title">A guided authority story, backed by the live system.</h3><p>One button runs the same persisted scenarios a judge can inspect. The plan is paced for <b>{formatGuidedDemoDuration()}</b>; controls remain available if you need to pause, skip, or restart.</p></div><div className="guided-demo-status"><ListVideo className="h-4 w-4" /><span>{status === "idle" ? "ready" : status === "complete" ? "proof ready" : `stage ${String(stepIndex + 1).padStart(2, "0")} / ${String(guidedDemoSteps.length).padStart(2, "0")}`}</span></div></div>
+    <div className="guided-demo-grid"><div className="guided-prompt"><label htmlFor="judge-demo-prompt">Judge narrative</label><textarea id="judge-demo-prompt" value={prompt} maxLength={220} onChange={event => onPromptChange(event.target.value)} aria-describedby="judge-demo-note" /><small id="judge-demo-note">This frames the narration. Sentra’s policy outcomes remain deterministic and server-persisted.</small></div><div className="guided-now" aria-live="polite"><span>Now demonstrating</span><b>{step.title}</b><p>{step.narration}</p><small>{step.evidence}</small></div></div>
+    <div className="guided-demo-controls"><button type="button" className="guided-start" disabled={!canStart || isBusy} onClick={onStart}><Play className="h-4 w-4" />{status === "idle" || status === "complete" ? "Start guided demo" : "Restart from baseline"}</button>{playing ? <button type="button" className="guided-control" onClick={onPause}><Pause className="h-4 w-4" />Pause</button> : status === "paused" ? <button type="button" className="guided-control" disabled={!canStart} onClick={onResume}><Play className="h-4 w-4" />Resume</button> : null}{canControl ? <button type="button" className="guided-control" onClick={onSkip}><SkipForward className="h-4 w-4" />Skip stage</button> : null}<button type="button" className="guided-control" onClick={onReset}><RotateCcw className="h-4 w-4" />Reset tour</button></div>
+    <ol className="guided-steps">{guidedDemoSteps.map((item,index) => <li key={item.title} className={index === stepIndex ? "guided-current" : index < stepIndex ? "guided-complete" : ""}><span>{String(index + 1).padStart(2, "0")}</span><b>{item.title}</b>{item.scenario ? <small>{item.scenario}</small> : <small>context</small>}</li>)}</ol>
+  </aside>;
+}
 function HeroMetric({ value,label }: { value:string; label:string }) { return <div><b>{value}</b><span>{label}</span></div>; }
 function MetricLarge({ value,label,icon:Icon }: { value:string; label:string; icon:typeof Database }) { return <div className="metric-large"><Icon className="h-4 w-4" /><b>{value}</b><span>{label}</span></div>; }
 function OutcomeBadge({ outcome }: { outcome:"ALLOW"|"DENY"|"ESCALATE"|"FREEZE" }) { return <span className={`outcome-badge outcome-${outcome}`}><CircleDot className="h-3 w-3" />{outcome}</span>; }

@@ -73,3 +73,12 @@
 - [x] Show a visible dashboard freshness timestamp that identifies the last successful live data refresh.
 - [x] Add a manual Clear Cache control that removes saved offline dashboard data safely.
 - [x] Add a persistent, subtle offline banner that warns cached evidence may be stale and validate all offline transparency controls.
+- [ ] Expire stale offline dashboard snapshots automatically after a bounded retention period.
+- [ ] Add a manual Refresh Now control for an explicit live dashboard refetch after reconnection.
+- [ ] Add a compact offline diagnostics panel with actionable browser, cache, and API connection status information.
+- [x] Add a judge-facing guided demo launch control with clear start, pause, skip, and reset behavior.
+- [x] Orchestrate a predefined step-by-step authority workflow that visibly demonstrates request, policy, capability, gateway, execution, and proof outcomes over approximately two to three minutes.
+- [x] Validate the guided demo end to end against persisted authority scenarios, responsive layouts, automated checks, and the repeatable proof verifier.
+- [x] Run the guided walkthrough from a fresh baseline through its stage 08 completion and verify its final proof-focused state.
+- [x] Confirm a completed guided run creates each intended authority scenario exactly once, then restore and verify the six-event judge baseline.
+- [x] Add focused automated coverage for guided-demo stage sequencing and pause-resume duplicate prevention.
