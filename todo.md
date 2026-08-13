@@ -29,3 +29,10 @@
 - [x] Create and push the private GitHub repository for the Round 2 submission.
 - [x] Save and verify the final web project checkpoint identifier.
 - [x] Create, push, and verify a private GitHub repository URL containing the final Round 2 code.
+- [x] Research and classify premium public design references for Sentra’s light-mode interactive redesign.
+- [x] Replace generic dashboard styling with an original Sentra editorial visual system, bespoke typography, and semantic color roles.
+- [x] Build a purposeful interactive authority artifact with light-mode depth, kinetic behavior, and no generic AI dashboard motifs.
+- [x] Redesign the live authority controls, proof-chain inspection, architecture, and progress content with stronger visual storytelling.
+- [x] Validate the redesign on desktop and mobile, test all live scenarios, and save the redesigned project checkpoint.
+- [ ] Save and verify a post-redesign project checkpoint for the premium light-mode experience.
+- [ ] Perform a final desktop and mobile smoke pass against the saved redesign state.
