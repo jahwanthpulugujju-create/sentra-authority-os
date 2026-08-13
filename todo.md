@@ -70,3 +70,6 @@
 - [x] Add a user-controlled retry action for transiently failed scenario mutations without automatic duplicate execution.
 - [x] Preserve and visibly present the last loaded dashboard data while the browser is offline or reconnecting.
 - [x] Notify users when Sentra reconnects after a transient dashboard transport failure and validate the recovery experience.
+- [x] Show a visible dashboard freshness timestamp that identifies the last successful live data refresh.
+- [x] Add a manual Clear Cache control that removes saved offline dashboard data safely.
+- [x] Add a persistent, subtle offline banner that warns cached evidence may be stale and validate all offline transparency controls.
