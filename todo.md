@@ -103,3 +103,10 @@
 - [x] Add an explicit valid-versus-replayed-request comparison state to the guided judge workflow.
 - [x] Make capability freshness, single consumption, protected execution, and replay refusal visually distinguishable in that contrast.
 - [x] Validate the updated workflow, responsive UI, automated checks, and six-scenario proof baseline before delivery.
+- [x] Audit every attached 46-plus roadmap requirement against the current Sentra codebase and classify it as complete, implementable, or human-gated in an exhaustive traceable matrix.
+- [x] Strengthen the protected-tool boundary and canonical authority envelope with fail-closed gateway permits, tenant, purpose, monetary limit, currency, workflow, step-budget, and idempotency binding.
+- [x] Add auditable key lifecycle, workflow binding, escalation, operational metrics, and proof-export capabilities appropriate to the controlled MVP.
+- [x] Add buyer-beachhead, phased-adoption, threat-model, release-runbook, and claim-boundary artifacts without fabricating customer or market evidence.
+- [x] Expand automated/adversarial coverage and validate the upgraded demo, recovery path, proof chain, responsive presentation, build, and proof-package export.
+- [x] Prepare explicit human-owned gates for interviews, source-backed market validation, final-machine rehearsal, backup recording, and claim approval.
+- [x] Deliver a completed-versus-human-gated roadmap execution report with limitations stated plainly.

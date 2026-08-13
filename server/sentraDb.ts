@@ -1,5 +1,5 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
-import { authorityEvents, protectedResources, type ProtectedResource } from "../drizzle/schema";
+import { and, asc, desc, eq, lt, sql } from "drizzle-orm";
+import { authorityEvents, capabilities, protectedResources, type ProtectedResource } from "../drizzle/schema";
 import { buildRecordHash } from "./authority";
 import { getDb } from "./db";
 
@@ -38,12 +38,17 @@ export async function listAuthorityEvents(limit = 12) {
   return db.select().from(authorityEvents).orderBy(desc(authorityEvents.id)).limit(limit);
 }
 
+export async function expireStaleCapabilities() {
+  const db = await getRequiredDb();
+  await db.update(capabilities).set({ status: "EXPIRED" }).where(and(eq(capabilities.status, "ISSUED"), lt(capabilities.expiresAt, new Date())));
+}
+
 export async function verifyProofChain() {
   const db = await getRequiredDb();
   const events = await db.select().from(authorityEvents).orderBy(asc(authorityEvents.id));
   let expectedPreviousHash = "GENESIS";
   for (const event of events) {
-    const recomputed = buildRecordHash({ previousHash: expectedPreviousHash, eventId: event.eventId, scenario: event.scenario, outcome: event.outcome, requestHash: event.requestHash, capabilityHash: event.capabilityHash, gatewayResult: event.gatewayResult, executionResult: event.executionResult });
+    const recomputed = buildRecordHash({ previousHash: expectedPreviousHash, eventId: event.eventId, scenario: event.scenario, outcome: event.outcome, requestHash: event.requestHash, capabilityHash: event.capabilityHash, approvalHash: event.approvalHash, gatewayResult: event.gatewayResult, executionResult: event.executionResult, reasonCode: event.reasonCode });
     if (event.previousHash !== expectedPreviousHash || event.recordHash !== recomputed) return { valid: false, checkedEvents: events.length, failedEventId: event.eventId };
     expectedPreviousHash = event.recordHash;
   }
@@ -55,5 +60,20 @@ export async function getDemoMetrics() {
   const [eventMetric] = await db.select({ count: sql<number>`count(*)` }).from(authorityEvents);
   const [blockedMetric] = await db.select({ count: sql<number>`count(*)` }).from(authorityEvents).where(sql`${authorityEvents.outcome} <> 'ALLOW'`);
   const [resourceMetric] = await db.select({ count: sql<number>`count(*)` }).from(protectedResources).where(eq(protectedResources.available, 1));
-  return { totalEvents: Number(eventMetric?.count || 0), blockedEvents: Number(blockedMetric?.count || 0), protectedResources: Number(resourceMetric?.count || 0) };
+  const [latencyMetric] = await db.select({ average: sql<number>`coalesce(round(avg(${authorityEvents.decisionLatencyMs})), 0)` }).from(authorityEvents);
+  const [expiredMetric] = await db.select({ count: sql<number>`count(*)` }).from(capabilities).where(eq(capabilities.status, "EXPIRED"));
+  const [escalationMetric] = await db.select({ count: sql<number>`count(*)` }).from(authorityEvents).where(eq(authorityEvents.outcome, "ESCALATE"));
+  const [keyRejectionMetric] = await db.select({ count: sql<number>`count(*)` }).from(authorityEvents).where(sql`${authorityEvents.reasonCode} in ('KEY_REVOKED', 'KEY_RETIRED', 'UNKNOWN_KEY')`);
+  const denialRows = await db.select({ reasonCode: authorityEvents.reasonCode, count: sql<number>`count(*)` }).from(authorityEvents).where(sql`${authorityEvents.outcome} <> 'ALLOW'`).groupBy(authorityEvents.reasonCode).orderBy(desc(sql<number>`count(*)`));
+  return {
+    totalEvents: Number(eventMetric?.count || 0),
+    blockedEvents: Number(blockedMetric?.count || 0),
+    protectedResources: Number(resourceMetric?.count || 0),
+    averageDecisionLatencyMs: Number(latencyMetric?.average || 0),
+    expiredCapabilities: Number(expiredMetric?.count || 0),
+    escalations: Number(escalationMetric?.count || 0),
+    keyRejections: Number(keyRejectionMetric?.count || 0),
+    gatewayDenialReasons: denialRows.map(row => ({ reasonCode: row.reasonCode, count: Number(row.count || 0) })),
+    telemetryScope: "local persistent demo data",
+  };
 }

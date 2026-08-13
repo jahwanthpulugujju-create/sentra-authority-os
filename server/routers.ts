@@ -2,15 +2,19 @@ import { desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { authorityEvents, capabilities, protectedResources } from "../drizzle/schema";
-import { buildCapability, buildRecordHash, buildScenarioDecision, scenarioLabels, sha256, stableStringify, verifyCapability, type SignedCapability } from "./authority";
-import { ensureProtectedResource, getDemoMetrics, getRequiredDb, listAuthorityEvents, refreshResourceContext, verifyProofChain } from "./sentraDb";
+import { buildCapability, buildEscalationApproval, buildRecordHash, buildScenarioDecision, scenarioLabels, sha256, stableStringify, verifyCapability, type SignedCapability } from "./authority";
+import { listKeyHistory } from "./keys";
+import { ACTIVE_POLICY_VERSION, listPolicyHistory, reasonCodeDescriptions } from "./policy";
+import { buildProofExportPackage } from "./proofExport";
+import { authorizeProtectedVendorApproval, executeProtectedVendorApproval } from "./protectedTool";
+import { ensureProtectedResource, expireStaleCapabilities, getDemoMetrics, getRequiredDb, listAuthorityEvents, refreshResourceContext, verifyProofChain } from "./sentraDb";
 import { COOKIE_NAME } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 
 function serializeEvent(event: typeof authorityEvents.$inferSelect) {
-  return { ...event, canonicalRequest: JSON.parse(event.canonicalRequest), capability: event.capability ? JSON.parse(event.capability) : null };
+  return { ...event, canonicalRequest: JSON.parse(event.canonicalRequest), capability: event.capability ? JSON.parse(event.capability) : null, approval: event.approval ? JSON.parse(event.approval) : null };
 }
 
 export const appRouter = router({
@@ -26,8 +30,14 @@ export const appRouter = router({
   authority: router({
     dashboard: publicProcedure.query(async () => {
       const resource = await ensureProtectedResource();
+      await expireStaleCapabilities();
       const [events, metrics, proofIntegrity] = await Promise.all([listAuthorityEvents(), getDemoMetrics(), verifyProofChain()]);
-      return { resource, metrics, proofIntegrity, events: events.map(serializeEvent) };
+      return { resource, metrics, proofIntegrity, policyHistory: listPolicyHistory(), activePolicyVersion: ACTIVE_POLICY_VERSION, keyHistory: listKeyHistory(), keyVerificationModel: "HMAC-SHA256 shared-secret MAC verification (controlled demo)", reasonCodeDescriptions, events: events.map(serializeEvent) };
+    }),
+    proofExport: publicProcedure.query(async () => {
+      await expireStaleCapabilities();
+      const [events, metrics, proofIntegrity] = await Promise.all([listAuthorityEvents(500), getDemoMetrics(), verifyProofChain()]);
+      return buildProofExportPackage({ proofIntegrity, metrics, policies: listPolicyHistory(), keys: listKeyHistory(), events: events.reverse().map(serializeEvent) });
     }),
     refreshContext: publicProcedure.mutation(async () => ({ resource: await refreshResourceContext() })),
     resetDemo: publicProcedure.mutation(async () => {
@@ -42,6 +52,7 @@ export const appRouter = router({
       return { resource: resetResource };
     }),
     runScenario: publicProcedure.input(z.object({ scenario: z.enum(scenarioLabels), idempotencyKey: z.string().min(8).max(48).optional() })).mutation(async ({ input }) => {
+      const startedAt = Date.now();
       const db = await getRequiredDb();
       const resource = await ensureProtectedResource();
       const now = new Date();
@@ -51,7 +62,7 @@ export const appRouter = router({
       if (existingEvent) {
         return { event: serializeEvent(existingEvent), resource };
       }
-      const decision = buildScenarioDecision(input.scenario, resource.contextScore, requestId);
+      const decision = buildScenarioDecision(input.scenario, resource.contextScore, requestId, input.idempotencyKey || requestId);
       const canonicalRequest = stableStringify(decision.request);
       const requestHash = sha256(canonicalRequest);
 
@@ -62,39 +73,45 @@ export const appRouter = router({
         let gatewayResult = decision.gatewayResult;
         let executionResult = decision.executionResult;
         let executionChanged = 0;
+        let approvalJson: string | null = null;
 
-        if (input.scenario === "Changed Request" && decision.approvalRequest) {
+        if (input.scenario === "Prompt Injection") {
+          approvalJson = stableStringify(buildEscalationApproval(decision.request, requestHash, now));
+        } else if (input.scenario === "Changed Request" && decision.approvalRequest) {
           const approvedHash = sha256(stableStringify(decision.approvalRequest));
           capability = buildCapability(decision.approvalRequest, approvedHash, now);
-          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash: approvedHash, payload: stableStringify(capability), signature: capability.signature, status: "ISSUED", issuedAt: now, expiresAt: new Date(capability.expiry) });
+          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash: approvedHash, payload: stableStringify(capability), signature: capability.signature, keyId: capability.keyId, keyVersion: capability.keyVersion, keyStatus: "ACTIVE", keyRotationDueAt: new Date(capability.keyRotationDueAt), status: "ISSUED", issuedAt: now, expiresAt: new Date(capability.expiry) });
           const verification = verifyCapability(capability, decision.request, requestHash, now.getTime());
           gatewayResult = `REJECTED: ${verification.reason}`;
           await tx.update(capabilities).set({ status: "REJECTED" }).where(eq(capabilities.capabilityId, capability.capabilityId));
         } else if (input.scenario === "Replay Attempt") {
           capability = buildCapability(decision.request, requestHash, now);
-          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash, payload: stableStringify(capability), signature: capability.signature, status: "CONSUMED", issuedAt: now, expiresAt: new Date(capability.expiry), consumedAt: now });
+          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash, payload: stableStringify(capability), signature: capability.signature, keyId: capability.keyId, keyVersion: capability.keyVersion, keyStatus: "ACTIVE", keyRotationDueAt: new Date(capability.keyRotationDueAt), status: "CONSUMED", issuedAt: now, expiresAt: new Date(capability.expiry), consumedAt: now });
           gatewayResult = "REJECTED: CAPABILITY_ALREADY_CONSUMED";
         } else if (decision.outcome === "ALLOW") {
           capability = buildCapability(decision.request, requestHash, now);
-          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash, payload: stableStringify(capability), signature: capability.signature, status: "ISSUED", issuedAt: now, expiresAt: new Date(capability.expiry) });
-          const verification = verifyCapability(capability, decision.request, requestHash, now.getTime());
-          if (!verification.valid) {
-            gatewayResult = `REJECTED: ${verification.reason}`;
+          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash, payload: stableStringify(capability), signature: capability.signature, keyId: capability.keyId, keyVersion: capability.keyVersion, keyStatus: "ACTIVE", keyRotationDueAt: new Date(capability.keyRotationDueAt), status: "ISSUED", issuedAt: now, expiresAt: new Date(capability.expiry) });
+          const gatewayAuthorization = authorizeProtectedVendorApproval({ capability, request: decision.request, requestHash, now: now.getTime() });
+          if (!gatewayAuthorization.allowed) {
+            gatewayResult = `REJECTED: ${gatewayAuthorization.reason}`;
             executionResult = "NOT EXECUTED: gateway verification failed";
             await tx.update(capabilities).set({ status: "REJECTED" }).where(eq(capabilities.capabilityId, capability.capabilityId));
           } else {
+            const protectedExecution = executeProtectedVendorApproval(gatewayAuthorization.permit);
             await tx.update(capabilities).set({ status: "CONSUMED", consumedAt: now }).where(eq(capabilities.capabilityId, capability.capabilityId));
-            await tx.update(protectedResources).set({ executionState: decision.request.desiredState === "APPROVED" ? 1 : 0, lastCheckedAt: now }).where(eq(protectedResources.id, resource.id));
-            gatewayResult = "VERIFIED: signature, exact request hash, scope, policy version, expiry, and nonce are valid";
-            executionResult = "EXECUTED: protected vendor approval was committed by the workspace tool";
-            executionChanged = 1;
+            await tx.update(protectedResources).set({ executionState: protectedExecution.executionState, lastCheckedAt: now }).where(eq(protectedResources.id, resource.id));
+            gatewayResult = "VERIFIED: signature, exact request hash, workflow scope, policy version, expiry, nonce, and idempotency key are valid";
+            executionResult = protectedExecution.result;
+            executionChanged = protectedExecution.executionChanged;
           }
         }
 
         const capabilityJson = capability ? stableStringify(capability) : null;
         const capabilityHash = capabilityJson ? sha256(capabilityJson) : null;
-        const recordHash = buildRecordHash({ previousHash, eventId, scenario: input.scenario, outcome: decision.outcome, requestHash, capabilityHash, gatewayResult, executionResult });
-        await tx.insert(authorityEvents).values({ eventId, scenario: input.scenario, outcome: decision.outcome, requestId, resourceId: resource.id, canonicalRequest, requestHash, capability: capabilityJson, capabilityHash, gatewayResult, executionResult, executionChanged, previousHash, recordHash });
+        const approvalHash = approvalJson ? sha256(approvalJson) : null;
+        const decisionLatencyMs = Math.max(0, Date.now() - startedAt);
+        const recordHash = buildRecordHash({ previousHash, eventId, scenario: input.scenario, outcome: decision.outcome, requestHash, capabilityHash, approvalHash, gatewayResult, executionResult, reasonCode: decision.reasonCode });
+        await tx.insert(authorityEvents).values({ eventId, scenario: input.scenario, outcome: decision.outcome, requestId, resourceId: resource.id, canonicalRequest, requestHash, policyVersion: decision.request.policyVersion, reasonCode: decision.reasonCode, capability: capabilityJson, capabilityHash, approval: approvalJson, approvalHash, gatewayResult, executionResult, executionChanged, decisionLatencyMs, previousHash, recordHash });
         return { eventId };
       });
 

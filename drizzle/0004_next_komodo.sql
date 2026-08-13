@@ -1,0 +1,2 @@
+ALTER TABLE `authority_events` ADD `policyVersion` varchar(64) DEFAULT 'sentra-policy-v1' NOT NULL;--> statement-breakpoint
+ALTER TABLE `authority_events` ADD `reasonCode` varchar(64) DEFAULT 'UNSPECIFIED' NOT NULL;
