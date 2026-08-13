@@ -36,3 +36,6 @@
 - [x] Re-test all live authority scenarios, verify desktop and mobile views, and save the approved reference-informed redesign checkpoint.
 - [x] Save and verify the final web project checkpoint identifier.
 - [x] Create, push, and verify a private GitHub repository URL containing the final Round 2 code.
+- [x] Audit and remove every dark panel, dark canvas, and dark-system treatment from the Sentra interface.
+- [x] Rebuild evidence, request, and system-map surfaces using premium light-mode materials and high-contrast readable text.
+- [x] Revalidate light-mode desktop and mobile layouts and ensure all live authority scenarios remain intact.
