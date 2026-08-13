@@ -1,5 +1,8 @@
 export const DASHBOARD_CACHE_KEY = "sentra-dashboard-snapshot-v1";
-export const DASHBOARD_CACHE_MAX_AGE_MS = 15 * 60 * 1_000;
+export const DASHBOARD_CACHE_RETENTION_KEY = "sentra-dashboard-retention-minutes-v1";
+export const DASHBOARD_CACHE_RETENTION_OPTIONS = [5, 15, 30, 60, 120] as const;
+export const DEFAULT_DASHBOARD_CACHE_RETENTION_MINUTES = 15;
+export const DASHBOARD_CACHE_MAX_AGE_MS = DEFAULT_DASHBOARD_CACHE_RETENTION_MINUTES * 60 * 1_000;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -7,8 +10,37 @@ export type DashboardSnapshot<T> = { data: T; savedAt?: number };
 
 export type DashboardSnapshotLoad<T> = { snapshot?: DashboardSnapshot<T>; expired: boolean };
 
+export function normalizeDashboardCacheRetentionMinutes(value: unknown) {
+  const minutes = typeof value === "number" ? value : Number(value);
+  return DASHBOARD_CACHE_RETENTION_OPTIONS.includes(minutes as (typeof DASHBOARD_CACHE_RETENTION_OPTIONS)[number])
+    ? minutes
+    : DEFAULT_DASHBOARD_CACHE_RETENTION_MINUTES;
+}
+
+export function dashboardCacheRetentionToMs(minutes: number) {
+  return normalizeDashboardCacheRetentionMinutes(minutes) * 60 * 1_000;
+}
+
+export function getDashboardCacheRetentionMinutes(storage?: StorageLike | null) {
+  try {
+    return normalizeDashboardCacheRetentionMinutes(storage?.getItem(DASHBOARD_CACHE_RETENTION_KEY));
+  } catch {
+    return DEFAULT_DASHBOARD_CACHE_RETENTION_MINUTES;
+  }
+}
+
+export function setDashboardCacheRetentionMinutes(minutes: number, storage?: StorageLike | null) {
+  const normalized = normalizeDashboardCacheRetentionMinutes(minutes);
+  try {
+    storage?.setItem(DASHBOARD_CACHE_RETENTION_KEY, String(normalized));
+  } catch {
+    // A blocked browser storage must not interrupt the authority UI.
+  }
+  return normalized;
+}
+
 export function isDashboardSnapshotExpired<T>(snapshot: DashboardSnapshot<T>, now = Date.now(), maxAgeMs = DASHBOARD_CACHE_MAX_AGE_MS) {
-  return !snapshot.savedAt || now - snapshot.savedAt >= maxAgeMs;
+  return typeof snapshot.savedAt !== "number" || now - snapshot.savedAt >= maxAgeMs;
 }
 
 export function loadDashboardSnapshot<T>(storage?: StorageLike | null, now = Date.now(), maxAgeMs = DASHBOARD_CACHE_MAX_AGE_MS): DashboardSnapshotLoad<T> {

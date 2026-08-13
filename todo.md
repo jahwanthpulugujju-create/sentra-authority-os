@@ -82,3 +82,10 @@
 - [x] Run the guided walkthrough from a fresh baseline through its stage 08 completion and verify its final proof-focused state.
 - [x] Confirm a completed guided run creates each intended authority scenario exactly once, then restore and verify the six-event judge baseline.
 - [x] Add focused automated coverage for guided-demo stage sequencing and pause-resume duplicate prevention.
+- [x] Add a visible, accessible guided-demo progress bar that represents the active stage and completion state.
+- [x] Add a persistent cache-retention setting with bounded duration choices and safe snapshot-expiry integration.
+- [x] Validate progress updates, cache-retention selection, offline expiry behavior, tests, build, and the authority baseline.
+- [x] Exercise selected cache-retention durations against a saved snapshot and verify keep-versus-clear behavior end to end.
+- [x] Add focused unit coverage that proves a reduced user-selected retention value expires an older saved snapshot immediately.
+- [x] Verify in-browser that an older saved snapshot remains available offline under a longer selected retention duration.
+- [x] Verify in-browser that reducing the configured retention removes an older saved snapshot, displays the expired-cache state, and deletes local storage.

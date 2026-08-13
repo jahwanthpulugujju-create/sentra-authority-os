@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatGuidedDemoDuration, getUndispatchedGuidedScenario, guidedDemoDurationMs, guidedDemoSteps } from "./guidedDemo";
+import { formatGuidedDemoDuration, getGuidedDemoProgress, getUndispatchedGuidedScenario, guidedDemoDurationMs, guidedDemoSteps } from "./guidedDemo";
 
 describe("guided judge demo", () => {
   it("covers every persisted authority scenario in a judge-sized walkthrough", () => {
@@ -20,5 +20,12 @@ describe("guided judge demo", () => {
     dispatched.add(1);
     expect(getUndispatchedGuidedScenario(1, dispatched)).toBeUndefined();
     expect(getUndispatchedGuidedScenario(2, dispatched)).toBe("Unauthorized Tool");
+  });
+
+  it("reports stable stage progress for idle, active, paused, and completed walkthroughs", () => {
+    expect(getGuidedDemoProgress(0, "idle")).toBe(0);
+    expect(getGuidedDemoProgress(0, "running")).toBe(13);
+    expect(getGuidedDemoProgress(3, "paused")).toBe(50);
+    expect(getGuidedDemoProgress(7, "complete")).toBe(100);
   });
 });

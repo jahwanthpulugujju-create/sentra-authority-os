@@ -31,3 +31,9 @@ export function getUndispatchedGuidedScenario(stepIndex: number, dispatchedSteps
   const scenario = guidedDemoSteps[stepIndex]?.scenario;
   return scenario && !dispatchedSteps.has(stepIndex) ? scenario : undefined;
 }
+
+export function getGuidedDemoProgress(stepIndex: number, status: "idle" | "running" | "paused" | "complete") {
+  if (status === "idle") return 0;
+  if (status === "complete") return 100;
+  return Math.min(100, Math.max(0, Math.round(((stepIndex + 1) / guidedDemoSteps.length) * 100)));
+}

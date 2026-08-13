@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearDashboardSnapshot, DASHBOARD_CACHE_KEY, loadDashboardSnapshot, readDashboardSnapshot, writeDashboardSnapshot } from "./dashboardCache";
+import { clearDashboardSnapshot, dashboardCacheRetentionToMs, DASHBOARD_CACHE_KEY, DASHBOARD_CACHE_RETENTION_KEY, getDashboardCacheRetentionMinutes, loadDashboardSnapshot, readDashboardSnapshot, setDashboardCacheRetentionMinutes, writeDashboardSnapshot } from "./dashboardCache";
 
 function createMemoryStorage() {
   const values = new Map<string, string>();
@@ -45,6 +45,28 @@ describe("dashboardCache", () => {
     const loaded = loadDashboardSnapshot(storage, 1_901, 900);
 
     expect(loaded).toEqual({ expired: true });
+    expect(storage.getItem(DASHBOARD_CACHE_KEY)).toBeNull();
+  });
+
+  it("persists only supported user-selected retention durations", () => {
+    const storage = createMemoryStorage();
+
+    expect(setDashboardCacheRetentionMinutes(60, storage)).toBe(60);
+    expect(getDashboardCacheRetentionMinutes(storage)).toBe(60);
+    expect(storage.getItem(DASHBOARD_CACHE_RETENTION_KEY)).toBe("60");
+    expect(setDashboardCacheRetentionMinutes(7, storage)).toBe(15);
+    expect(getDashboardCacheRetentionMinutes(storage)).toBe(15);
+  });
+
+  it("applies a newly reduced user retention window to an existing snapshot", () => {
+    const storage = createMemoryStorage();
+    writeDashboardSnapshot({ events: [{ eventId: "retention-case" }] }, 0, storage);
+
+    setDashboardCacheRetentionMinutes(60, storage);
+    expect(loadDashboardSnapshot(storage, 6 * 60 * 1_000, dashboardCacheRetentionToMs(getDashboardCacheRetentionMinutes(storage))).snapshot).toBeDefined();
+
+    setDashboardCacheRetentionMinutes(5, storage);
+    expect(loadDashboardSnapshot(storage, 6 * 60 * 1_000, dashboardCacheRetentionToMs(getDashboardCacheRetentionMinutes(storage)))).toEqual({ expired: true });
     expect(storage.getItem(DASHBOARD_CACHE_KEY)).toBeNull();
   });
 });
