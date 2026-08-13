@@ -1,0 +1,31 @@
+# Project TODO
+
+- [x] Define a persistent database schema for IoT device state, authority decisions, capabilities, and hash linked audit records.
+- [x] Implement a deterministic scenario API that produces only ALLOW, DENY, ESCALATE, or FREEZE outcomes.
+- [x] Enforce the hard rule that the actuator changes state only after a valid Sentra authorization and gateway verification.
+- [x] Persist canonical request data, capability data, execution result, and chained record hashes for replayable proof.
+- [x] Build a refined Sentra landing hero with live connection and decision status.
+- [x] Build an interactive IoT simulation with a temperature feed, agent request, and LED or fan actuator.
+- [x] Build a live authority decision feed with canonical request, outcome, capability, and gateway verification details.
+- [x] Build exact one click scenario controls for Valid Action, Unauthorized Tool, Prompt Injection, Changed Request, Burst Anomaly, and Replay Attempt.
+- [x] Build an audit proof timeline that visualizes persisted hash linked records.
+- [x] Build architecture and request to proof flow sections using Control, Data, Enforcement, and Evidence labels.
+- [x] Build a progress update page with completed components, active work, limitations, and evidence metrics.
+- [x] Add responsive styling, accessibility support, and polished motion for a judge friendly presentation.
+- [x] Write Vitest coverage for the authority outcome rules, actuator enforcement rule, and hash linked proof chain.
+- [x] Verify the application visually on desktop and mobile and inspect runtime logs for errors.
+- [x] Show the canonical request and signed capability details within every authority decision record.
+- [x] Expand each audit timeline entry to show the full request, decision, capability, gateway, and execution proof chain.
+- [x] Add an explicit in progress update and visible passing tests metric to the progress section.
+- [x] Expose the full canonical request and signed capability payload in each authority decision record.
+- [x] Render the complete request, decision, capability, gateway, and execution evidence in every audit timeline item.
+- [x] Create a final project checkpoint after all TODO items are complete.
+- [x] Superseded the virtual IoT emulator scope because Round 2 is a software-only Sentra MVP.
+- [x] Superseded the no-hardware simulator disclosure because no simulator or hardware component is part of the revised scope.
+- [x] Replace IoT device, sensor, and actuator terminology with an agent request, protected software tool, and execution state.
+- [x] Remove IoT, MQTT, and hardware claims from the backend, interface, progress update, and Round 2 demo copy.
+- [x] Add a GitHub-ready README and dedicated progress update for the software-only Sentra MVP.
+- [x] Update the live scenario rules and tests to prove protected software execution changes only after ALLOW.
+- [x] Create and push the private GitHub repository for the Round 2 submission.
+- [ ] Save and verify the final web project checkpoint identifier.
+- [ ] Create, push, and verify a private GitHub repository URL containing the final Round 2 code.

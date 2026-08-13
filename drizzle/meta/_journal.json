@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1786626968112,
+      "tag": "0000_nasty_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1786627161521,
+      "tag": "0001_elite_george_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786627999159,
+      "tag": "0002_fixed_firedrake",
+      "breakpoints": true
+    }
+  ]
 }
