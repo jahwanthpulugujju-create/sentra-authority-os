@@ -27,5 +27,5 @@
 - [x] Add a GitHub-ready README and dedicated progress update for the software-only Sentra MVP.
 - [x] Update the live scenario rules and tests to prove protected software execution changes only after ALLOW.
 - [x] Create and push the private GitHub repository for the Round 2 submission.
-- [ ] Save and verify the final web project checkpoint identifier.
-- [ ] Create, push, and verify a private GitHub repository URL containing the final Round 2 code.
+- [x] Save and verify the final web project checkpoint identifier.
+- [x] Create, push, and verify a private GitHub repository URL containing the final Round 2 code.
