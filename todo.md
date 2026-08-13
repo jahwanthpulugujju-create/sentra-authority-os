@@ -67,3 +67,6 @@
 - [x] Deliver an honest professional readiness report and a 100-day team operating plan with human validation gates.
 - [x] Diagnose and repair browser-to-tRPC fetch failures affecting the dashboard query and scenario mutations.
 - [x] Validate the repaired API transport through browser interaction, automated checks, and the repeatable Sentra verifier.
+- [x] Add a user-controlled retry action for transiently failed scenario mutations without automatic duplicate execution.
+- [x] Preserve and visibly present the last loaded dashboard data while the browser is offline or reconnecting.
+- [x] Notify users when Sentra reconnects after a transient dashboard transport failure and validate the recovery experience.

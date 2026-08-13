@@ -1,7 +1,8 @@
 import { trpc } from "@/lib/trpc";
 import { isTransientNetworkError } from "@/lib/apiReliability";
-import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Cpu, Database, FileCheck2, Fingerprint, KeyRound, LockKeyhole, ScanLine, ShieldCheck, TimerReset, TriangleAlert, Zap } from "lucide-react";
-import { useMemo, useState, type CSSProperties } from "react";
+import { readDashboardSnapshot, writeDashboardSnapshot } from "@/lib/dashboardCache";
+import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Cpu, Database, FileCheck2, Fingerprint, KeyRound, LockKeyhole, RefreshCw, ScanLine, ShieldCheck, TimerReset, TriangleAlert, WifiOff, Zap } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
 const scenarios = [
@@ -16,25 +17,70 @@ const scenarios = [
 const outcomeCopy = { ALLOW: "Authority granted", DENY: "Authority refused", ESCALATE: "Human review required", FREEZE: "Agent session contained" } as const;
 const shortHash = (value?: string | null) => value ? `${value.slice(0, 12)}…${value.slice(-6)}` : "not issued";
 const formatTime = (value?: string | Date) => value ? new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Awaiting first event";
+type ScenarioName = (typeof scenarios)[number]["label"];
+type ScenarioAttempt = { scenario: ScenarioName; idempotencyKey: string };
+
+function createScenarioAttempt(scenario: ScenarioName): ScenarioAttempt {
+  const idempotencyKey = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+  return { scenario, idempotencyKey };
+}
+
+function useBrowserOnline() {
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  useEffect(() => {
+    const markOnline = () => setOnline(true);
+    const markOffline = () => setOnline(false);
+    window.addEventListener("online", markOnline);
+    window.addEventListener("offline", markOffline);
+    return () => {
+      window.removeEventListener("online", markOnline);
+      window.removeEventListener("offline", markOffline);
+    };
+  }, []);
+  return online;
+}
 
 export default function Home() {
   const utils = trpc.useUtils();
   const dashboard = trpc.authority.dashboard.useQuery(undefined, { refetchInterval: 3500, placeholderData: previousData => previousData });
+  const [offlineDashboard, setOfflineDashboard] = useState<NonNullable<typeof dashboard.data> | undefined>(() => readDashboardSnapshot<NonNullable<typeof dashboard.data>>(typeof localStorage === "undefined" ? undefined : localStorage));
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
+  const [lastFailedScenario, setLastFailedScenario] = useState<ScenarioAttempt | null>(null);
   const [artifactPointer, setArtifactPointer] = useState({ x: 0, y: 0 });
+  const browserOnline = useBrowserOnline();
+  const reconnectAfterRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!dashboard.data) return;
+    setOfflineDashboard(dashboard.data);
+    writeDashboardSnapshot(dashboard.data, typeof localStorage === "undefined" ? undefined : localStorage);
+  }, [dashboard.data]);
   const resetDemo = trpc.authority.resetDemo.useMutation({
     onSuccess: () => { setActiveScenario(null); utils.authority.dashboard.invalidate(); toast.success("Demo reset: protected state and proof history are back to baseline."); },
     onError: error => toast.error(isTransientNetworkError(error) ? "Connection interrupted. Reset was not confirmed; wait for Sentra to reconnect." : error.message),
   });
   const runScenario = trpc.authority.runScenario.useMutation({
-    onSuccess: data => { utils.authority.dashboard.invalidate(); setActiveScenario(data.event.scenario); toast.success(`${data.event.outcome}: ${data.event.executionResult}`); },
-    onError: error => { setActiveScenario(null); toast.error(isTransientNetworkError(error) ? "Connection interrupted. The browser did not receive a confirmed decision; check the ledger before retrying." : error.message); },
+    onSuccess: data => { setLastFailedScenario(null); utils.authority.dashboard.invalidate(); setActiveScenario(data.event.scenario); toast.success(`${data.event.outcome}: ${data.event.executionResult}`); },
+    onError: (error, variables) => { setActiveScenario(null); if (isTransientNetworkError(error) && variables.idempotencyKey) { setLastFailedScenario({ scenario: variables.scenario, idempotencyKey: variables.idempotencyKey }); toast.error("Connection interrupted. Retry will reuse the same request key and cannot create a second authority event."); return; } setLastFailedScenario(null); toast.error(error.message); },
   });
 
-  const data = dashboard.data;
-  const apiUnavailable = dashboard.isError;
+  const apiUnavailable = !browserOnline || dashboard.isError;
+  useEffect(() => {
+    if (apiUnavailable) {
+      reconnectAfterRef.current ??= dashboard.dataUpdatedAt || Date.now();
+      return;
+    }
+    if (reconnectAfterRef.current !== null && dashboard.isSuccess && dashboard.dataUpdatedAt > reconnectAfterRef.current) {
+      toast.success("Sentra reconnected. Live authority data is current again.");
+      reconnectAfterRef.current = null;
+    }
+  }, [apiUnavailable, dashboard.dataUpdatedAt, dashboard.isSuccess]);
+
+  const data = dashboard.data ?? offlineDashboard;
+  const usingOfflineData = apiUnavailable && Boolean(data);
   const apiReady = Boolean(data) && !apiUnavailable;
-  const connectionLabel = apiUnavailable ? "reconnecting" : dashboard.isFetching && !data ? "connecting" : "connected";
+  const connectionLabel = usingOfflineData ? "offline view" : apiUnavailable ? "reconnecting" : dashboard.isFetching && !data ? "connecting" : "connected";
   const resource = data?.resource;
   const events = data?.events || [];
   const latest = events[0];
@@ -56,7 +102,7 @@ export default function Home() {
     <header className="site-header"><div className="site-header-inner">
       <a href="#top" className="brand-lockup"><img src="/manus-storage/sentra-logo_24a70887.png" className="brand-mark" alt="Sentra logo" /><div><p>Sentra</p><span>Authority OS</span></div></a>
       <nav className="site-nav"><a href="#demo">Demo</a><a href="#proof">Evidence</a><a href="#architecture">System</a><a href="#progress">MVP</a></nav>
-      <div className="system-online"><span className="status-dot pulse" />{apiUnavailable ? "Reconnecting" : "Live authority"}</div>
+      <div className={`system-online ${apiUnavailable ? "system-recovering" : ""}`}><span className="status-dot pulse" />{usingOfflineData ? "Offline view" : apiUnavailable ? "Reconnecting" : "Live authority"}</div>
     </div></header>
 
     <main id="top">
@@ -77,12 +123,13 @@ export default function Home() {
       </div></section>
 
       <section id="demo" className="content-section demo-section"><SectionHeading eyebrow="Live system demonstration" title="Ask the boundary a question." description="Each control calls the real authority API. Sentra persists the canonical request, evaluates policy, issues a capability only when valid, and changes protected state only after gateway verification." />
-        <div className="demo-layout"><div className="demo-rail"><div className="rail-head"><div><span className="eyebrow">A single protected path</span><h3>Proposal is not permission.</h3></div><span className="connected-state"><span className="status-dot" />{connectionLabel}</span></div>
+        <div className="demo-layout"><div className="demo-rail"><div className="rail-head"><div><span className="eyebrow">A single protected path</span><h3>Proposal is not permission.</h3></div><span className={`connected-state ${apiUnavailable ? "connection-offline" : ""}`}><span className="status-dot" />{connectionLabel}</span></div>
           <div className="path-map"><PathStep number="01" icon={Cpu} title="Procurement agent" detail="submits a proposal" /><PathStep number="02" icon={ShieldCheck} title="Sentra policy kernel" detail="returns a bounded decision" tone="brand" /><PathStep number="03" icon={FileCheck2} title="Vendor approval tool" detail={active ? "state changed after ALLOW" : "held until verified"} tone={active ? "green" : "neutral"} /></div>
           <div className="rule-notice"><LockKeyhole className="h-4 w-4" /><span>The workspace state is server-held. It changes only after a valid <b>ALLOW</b> and gateway check.</span></div>
-        </div><div className="scenario-console"><div className="console-head"><div><span className="eyebrow">Authority test suite</span><h3>Choose a scenario.</h3></div><div className="console-controls"><span className="console-status">{apiUnavailable ? "reconnecting" : "live database"}</span><button type="button" className="demo-reset" disabled={runScenario.isPending || resetDemo.isPending || !apiReady} onClick={() => resetDemo.mutate()}><TimerReset className="h-3.5 w-3.5" />Reset baseline</button></div></div>
-          <div className="scenario-grid">{scenarios.map(({ label, icon: Icon, note, tone }, index) => <button key={label} type="button" disabled={runScenario.isPending || !apiReady} onClick={() => { setActiveScenario(label); runScenario.mutate({ scenario: label }); }} className={`scenario-button scenario-${tone} ${activeScenario === label ? "scenario-active" : ""}`}><span className="scenario-index">0{index + 1}</span><span className="scenario-icon"><Icon className="h-4 w-4" /></span><span className="scenario-content"><b>{label}</b><small>{note}</small></span><ChevronRight className="h-4 w-4 scenario-arrow" /></button>)}</div>
-          <div className="decision-strip" aria-live="polite"><span>Latest verdict</span>{apiUnavailable ? <p>Connection is recovering. Scenario controls remain locked until Sentra reconnects.</p> : latest ? <><OutcomeBadge outcome={latest.outcome} /><p>{latest.gatewayResult}</p></> : <p>Select a test to create a persisted decision.</p>}</div>
+        </div><div className="scenario-console"><div className="console-head"><div><span className="eyebrow">Authority test suite</span><h3>Choose a scenario.</h3></div><div className="console-controls"><span className={`console-status ${apiUnavailable ? "status-offline" : ""}`}>{usingOfflineData ? "offline cache" : apiUnavailable ? "reconnecting" : "live database"}</span><button type="button" className="demo-reset" disabled={runScenario.isPending || resetDemo.isPending || !apiReady} onClick={() => resetDemo.mutate()}><TimerReset className="h-3.5 w-3.5" />Reset baseline</button>{lastFailedScenario ? <button type="button" className="scenario-retry" disabled={runScenario.isPending || !apiReady} onClick={() => { setActiveScenario(lastFailedScenario.scenario); runScenario.mutate(lastFailedScenario); }}><RefreshCw className="h-3.5 w-3.5" />Retry {lastFailedScenario.scenario}</button> : null}</div></div>
+          {usingOfflineData ? <div className="offline-notice" role="status"><WifiOff className="h-4 w-4" /><div><b>Offline dashboard view</b><span>Showing the last loaded server data. Scenario controls remain locked until a fresh connection is verified.</span></div></div> : null}
+          <div className="scenario-grid">{scenarios.map(({ label, icon: Icon, note, tone }, index) => <button key={label} type="button" disabled={runScenario.isPending || !apiReady} onClick={() => { const attempt = createScenarioAttempt(label); setActiveScenario(label); setLastFailedScenario(null); runScenario.mutate(attempt); }} className={`scenario-button scenario-${tone} ${activeScenario === label ? "scenario-active" : ""}`}><span className="scenario-index">0{index + 1}</span><span className="scenario-icon"><Icon className="h-4 w-4" /></span><span className="scenario-content"><b>{label}</b><small>{note}</small></span><ChevronRight className="h-4 w-4 scenario-arrow" /></button>)}</div>
+          <div className="decision-strip" aria-live="polite"><span>Latest verdict</span>{usingOfflineData ? <p>Offline cache active. This evidence is the last loaded dashboard state and cannot authorize actions.</p> : apiUnavailable ? <p>Connection is recovering. Scenario controls remain locked until Sentra reconnects.</p> : latest ? <><OutcomeBadge outcome={latest.outcome} /><p>{latest.gatewayResult}</p></> : <p>Select a test to create a persisted decision.</p>}</div>
         </div></div>
       </section>
 

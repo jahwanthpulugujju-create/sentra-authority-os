@@ -41,12 +41,16 @@ export const appRouter = router({
       const [resetResource] = await db.select().from(protectedResources).where(eq(protectedResources.id, resource.id)).limit(1);
       return { resource: resetResource };
     }),
-    runScenario: publicProcedure.input(z.object({ scenario: z.enum(scenarioLabels) })).mutation(async ({ input }) => {
+    runScenario: publicProcedure.input(z.object({ scenario: z.enum(scenarioLabels), idempotencyKey: z.string().min(8).max(48).optional() })).mutation(async ({ input }) => {
       const db = await getRequiredDb();
       const resource = await ensureProtectedResource();
       const now = new Date();
       const eventId = `evt_${nanoid(12)}`;
-      const requestId = `req_${nanoid(12)}`;
+      const requestId = input.idempotencyKey ? `req_${input.idempotencyKey}` : `req_${nanoid(12)}`;
+      const [existingEvent] = await db.select().from(authorityEvents).where(eq(authorityEvents.requestId, requestId)).limit(1);
+      if (existingEvent) {
+        return { event: serializeEvent(existingEvent), resource };
+      }
       const decision = buildScenarioDecision(input.scenario, resource.contextScore, requestId);
       const canonicalRequest = stableStringify(decision.request);
       const requestHash = sha256(canonicalRequest);
