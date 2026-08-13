@@ -84,7 +84,9 @@ The script resets the demo baseline, executes all six scenarios through the serv
 | Working MVP | Persistent fullstack application with live scenario controls and database-backed state. |
 | Progress update | [`progress-update.md`](./progress-update.md) |
 | Live demo | [`demo-script.md`](./demo-script.md) |
+| Architecture decisions | [`ARCHITECTURE_DECISIONS.md`](./ARCHITECTURE_DECISIONS.md) |
 | Professional readiness review | [`SENTRA_PROFESSIONAL_REVIEW.md`](./SENTRA_PROFESSIONAL_REVIEW.md) |
+| Readiness assessment | [`SENTRA_READINESS_ASSESSMENT.md`](./SENTRA_READINESS_ASSESSMENT.md) |
 | 100-day team operating plan | [`SENTRA_100_DAY_OPERATING_PLAN.md`](./SENTRA_100_DAY_OPERATING_PLAN.md) |
 
 ## Scope and limitations
