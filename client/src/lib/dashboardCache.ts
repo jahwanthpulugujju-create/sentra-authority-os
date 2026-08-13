@@ -1,22 +1,36 @@
 export const DASHBOARD_CACHE_KEY = "sentra-dashboard-snapshot-v1";
+export const DASHBOARD_CACHE_MAX_AGE_MS = 15 * 60 * 1_000;
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export type DashboardSnapshot<T> = { data: T; savedAt?: number };
 
-export function readDashboardSnapshot<T>(storage?: StorageLike | null): DashboardSnapshot<T> | undefined {
+export type DashboardSnapshotLoad<T> = { snapshot?: DashboardSnapshot<T>; expired: boolean };
+
+export function isDashboardSnapshotExpired<T>(snapshot: DashboardSnapshot<T>, now = Date.now(), maxAgeMs = DASHBOARD_CACHE_MAX_AGE_MS) {
+  return !snapshot.savedAt || now - snapshot.savedAt >= maxAgeMs;
+}
+
+export function loadDashboardSnapshot<T>(storage?: StorageLike | null, now = Date.now(), maxAgeMs = DASHBOARD_CACHE_MAX_AGE_MS): DashboardSnapshotLoad<T> {
   try {
     const raw = storage?.getItem(DASHBOARD_CACHE_KEY);
-    if (!raw) return undefined;
+    if (!raw) return { expired: false };
     const parsed = JSON.parse(raw) as DashboardSnapshot<T> | T;
-    if (typeof parsed === "object" && parsed !== null && "data" in parsed && "savedAt" in parsed) {
-      return parsed as DashboardSnapshot<T>;
+    const snapshot = typeof parsed === "object" && parsed !== null && "data" in parsed && "savedAt" in parsed
+      ? parsed as DashboardSnapshot<T>
+      : { data: parsed as T };
+    if (isDashboardSnapshotExpired(snapshot, now, maxAgeMs)) {
+      storage?.removeItem(DASHBOARD_CACHE_KEY);
+      return { expired: true };
     }
-    // Preserve any cache written by the earlier offline-view release.
-    return { data: parsed as T };
+    return { snapshot, expired: false };
   } catch {
-    return undefined;
+    return { expired: false };
   }
+}
+
+export function readDashboardSnapshot<T>(storage?: StorageLike | null, now = Date.now(), maxAgeMs = DASHBOARD_CACHE_MAX_AGE_MS): DashboardSnapshot<T> | undefined {
+  return loadDashboardSnapshot<T>(storage, now, maxAgeMs).snapshot;
 }
 
 export function writeDashboardSnapshot<T>(value: T, savedAt: number, storage?: StorageLike | null): DashboardSnapshot<T> {

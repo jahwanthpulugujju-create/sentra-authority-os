@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearDashboardSnapshot, DASHBOARD_CACHE_KEY, readDashboardSnapshot, writeDashboardSnapshot } from "./dashboardCache";
+import { clearDashboardSnapshot, DASHBOARD_CACHE_KEY, loadDashboardSnapshot, readDashboardSnapshot, writeDashboardSnapshot } from "./dashboardCache";
 
 function createMemoryStorage() {
   const values = new Map<string, string>();
@@ -18,7 +18,7 @@ describe("dashboardCache", () => {
     writeDashboardSnapshot(snapshot, 1_786_641_830_000, storage);
 
     expect(storage.getItem(DASHBOARD_CACHE_KEY)).toContain("evt-1");
-    expect(readDashboardSnapshot<typeof snapshot>(storage)).toEqual({ data: snapshot, savedAt: 1_786_641_830_000 });
+    expect(readDashboardSnapshot<typeof snapshot>(storage, 1_786_641_830_100)).toEqual({ data: snapshot, savedAt: 1_786_641_830_000 });
   });
 
   it("ignores malformed cached data", () => {
@@ -36,5 +36,15 @@ describe("dashboardCache", () => {
 
     expect(storage.getItem(DASHBOARD_CACHE_KEY)).toBeNull();
     expect(readDashboardSnapshot(storage)).toBeUndefined();
+  });
+
+  it("expires a stale saved snapshot and removes it from storage", () => {
+    const storage = createMemoryStorage();
+    writeDashboardSnapshot({ events: [{ eventId: "expired" }] }, 1_000, storage);
+
+    const loaded = loadDashboardSnapshot(storage, 1_901, 900);
+
+    expect(loaded).toEqual({ expired: true });
+    expect(storage.getItem(DASHBOARD_CACHE_KEY)).toBeNull();
   });
 });

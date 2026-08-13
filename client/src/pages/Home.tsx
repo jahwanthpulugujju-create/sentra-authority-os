@@ -1,8 +1,8 @@
 import { trpc } from "@/lib/trpc";
 import { isTransientNetworkError } from "@/lib/apiReliability";
-import { clearDashboardSnapshot, readDashboardSnapshot, writeDashboardSnapshot, type DashboardSnapshot } from "@/lib/dashboardCache";
+import { clearDashboardSnapshot, isDashboardSnapshotExpired, loadDashboardSnapshot, writeDashboardSnapshot, type DashboardSnapshot } from "@/lib/dashboardCache";
 import { formatGuidedDemoDuration, getUndispatchedGuidedScenario, guidedDemoSteps } from "@/lib/guidedDemo";
-import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Clock3, Cpu, Database, FileCheck2, Fingerprint, KeyRound, ListVideo, LockKeyhole, Pause, Play, RefreshCw, RotateCcw, ScanLine, ShieldCheck, SkipForward, Sparkles, TimerReset, TriangleAlert, WifiOff, X, Zap } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Clock3, Cpu, Database, FileCheck2, Fingerprint, Gauge, KeyRound, ListVideo, LockKeyhole, Pause, Play, RefreshCw, RotateCcw, ScanLine, ShieldCheck, SkipForward, Sparkles, TimerReset, TriangleAlert, WifiOff, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
@@ -19,6 +19,11 @@ const outcomeCopy = { ALLOW: "Authority granted", DENY: "Authority refused", ESC
 const shortHash = (value?: string | null) => value ? `${value.slice(0, 12)}…${value.slice(-6)}` : "not issued";
 const formatTime = (value?: string | Date) => value ? new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Awaiting first event";
 const formatRefreshTime = (value?: number) => value ? new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "No live dashboard saved";
+const formatSnapshotAge = (value?: number) => {
+  if (!value) return "not available";
+  const seconds = Math.max(0, Math.floor((Date.now() - value) / 1_000));
+  return seconds < 60 ? "less than a minute" : seconds < 3_600 ? `${Math.floor(seconds / 60)} min` : `${Math.floor(seconds / 3_600)} hr`;
+};
 type ScenarioName = (typeof scenarios)[number]["label"];
 type ScenarioAttempt = { scenario: ScenarioName; idempotencyKey: string };
 type GuidedDemoStatus = "idle" | "running" | "paused" | "complete";
@@ -49,7 +54,9 @@ export default function Home() {
   const utils = trpc.useUtils();
   const dashboard = trpc.authority.dashboard.useQuery(undefined, { refetchInterval: 3500, placeholderData: previousData => previousData });
   const storage = typeof localStorage === "undefined" ? undefined : localStorage;
-  const [offlineSnapshot, setOfflineSnapshot] = useState<DashboardSnapshot<NonNullable<typeof dashboard.data>> | undefined>(() => readDashboardSnapshot<NonNullable<typeof dashboard.data>>(storage));
+  const [initialSnapshotLoad] = useState(() => loadDashboardSnapshot<NonNullable<typeof dashboard.data>>(storage));
+  const [offlineSnapshot, setOfflineSnapshot] = useState<DashboardSnapshot<NonNullable<typeof dashboard.data>> | undefined>(() => initialSnapshotLoad.snapshot);
+  const [cacheExpired, setCacheExpired] = useState(() => initialSnapshotLoad.expired);
   const [lastLiveRefreshAt, setLastLiveRefreshAt] = useState<number | undefined>(() => offlineSnapshot?.savedAt);
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [lastFailedScenario, setLastFailedScenario] = useState<ScenarioAttempt | null>(null);
@@ -65,6 +72,7 @@ export default function Home() {
     const savedAt = dashboard.dataUpdatedAt || Date.now();
     setOfflineSnapshot(writeDashboardSnapshot(dashboard.data, savedAt, storage));
     setLastLiveRefreshAt(savedAt);
+    setCacheExpired(false);
   }, [dashboard.data, dashboard.dataUpdatedAt, storage]);
   const resetDemo = trpc.authority.resetDemo.useMutation({
     onSuccess: () => { setActiveScenario(null); utils.authority.dashboard.invalidate(); toast.success("Demo reset: protected state and proof history are back to baseline."); },
@@ -77,6 +85,19 @@ export default function Home() {
 
   const apiUnavailable = !browserOnline || dashboard.isError;
   useEffect(() => {
+    if (!offlineSnapshot?.savedAt) return;
+    const expiresIn = Math.max(0, offlineSnapshot.savedAt + 15 * 60 * 1_000 - Date.now());
+    const timeout = window.setTimeout(() => {
+      if (isDashboardSnapshotExpired(offlineSnapshot)) {
+        clearDashboardSnapshot(storage);
+        setOfflineSnapshot(undefined);
+        setCacheExpired(true);
+        toast.message("Saved offline dashboard data expired after 15 minutes.");
+      }
+    }, expiresIn + 50);
+    return () => window.clearTimeout(timeout);
+  }, [offlineSnapshot, storage]);
+  useEffect(() => {
     if (apiUnavailable) {
       reconnectAfterRef.current ??= dashboard.dataUpdatedAt || Date.now();
       return;
@@ -87,7 +108,7 @@ export default function Home() {
     }
   }, [apiUnavailable, dashboard.dataUpdatedAt, dashboard.isSuccess]);
 
-  const data = dashboard.data ?? offlineSnapshot?.data;
+  const data = apiUnavailable ? offlineSnapshot?.data : dashboard.data ?? offlineSnapshot?.data;
   const usingOfflineData = apiUnavailable && Boolean(data);
   const cachedDashboardAvailable = Boolean(offlineSnapshot);
   const apiReady = Boolean(data) && !apiUnavailable;
@@ -96,8 +117,21 @@ export default function Home() {
   const clearOfflineCache = () => {
     clearDashboardSnapshot(storage);
     setOfflineSnapshot(undefined);
+    setCacheExpired(false);
     if (!dashboard.data) setLastLiveRefreshAt(undefined);
     toast.success("Saved offline dashboard data cleared.");
+  };
+  const refreshDashboard = async () => {
+    if (!browserOnline) {
+      toast.error("Refresh needs a browser connection. Reconnect and try again.");
+      return;
+    }
+    const result = await dashboard.refetch();
+    if (result.error) {
+      toast.error(isTransientNetworkError(result.error) ? "Sentra is still unreachable. The last saved dashboard remains protected." : result.error.message);
+      return;
+    }
+    toast.success("Live authority dashboard refreshed.");
   };
   const guidedStep = guidedDemoSteps[guidedDemoIndex];
   const beginGuidedDemo = async () => {
@@ -163,7 +197,7 @@ export default function Home() {
       <nav className="site-nav"><a href="#demo">Demo</a><a href="#proof">Evidence</a><a href="#architecture">System</a><a href="#progress">MVP</a></nav>
       <div className={`system-online ${apiUnavailable ? "system-recovering" : ""}`}><span className="status-dot pulse" />{usingOfflineData ? "Offline view" : apiUnavailable ? "Reconnecting" : "Live authority"}</div>
     </div></header>
-    {apiUnavailable ? <aside className="offline-banner" role="status"><div><WifiOff className="h-4 w-4" /><span><b>{usingOfflineData ? "Offline view active." : "Offline with no saved dashboard."}</b> {usingOfflineData ? `Evidence may be stale; last live refresh ${freshnessLabel}.` : "Reconnect to load authority evidence."}</span></div>{cachedDashboardAvailable ? <button type="button" onClick={clearOfflineCache}><X className="h-3.5 w-3.5" />Clear cache</button> : null}</aside> : null}
+    {apiUnavailable ? <aside className="offline-banner" role="status"><div><WifiOff className="h-4 w-4" /><span><b>{usingOfflineData ? "Offline view active." : cacheExpired ? "Saved offline data expired." : "Offline with no saved dashboard."}</b> {usingOfflineData ? `Evidence may be stale; last live refresh ${freshnessLabel}.` : cacheExpired ? "The cache was removed after its 15-minute retention period." : "Reconnect to load authority evidence."}</span></div>{cachedDashboardAvailable ? <button type="button" onClick={clearOfflineCache}><X className="h-3.5 w-3.5" />Clear cache</button> : null}</aside> : null}
 
     <main id="top">
       <section className="hero-stage"><div className="hero-grid">
@@ -187,8 +221,8 @@ export default function Home() {
         <div className="demo-layout"><div className="demo-rail"><div className="rail-head"><div><span className="eyebrow">A single protected path</span><h3>Proposal is not permission.</h3></div><span className={`connected-state ${apiUnavailable ? "connection-offline" : ""}`}><span className="status-dot" />{connectionLabel}</span></div>
           <div className="path-map"><PathStep number="01" icon={Cpu} title="Procurement agent" detail="submits a proposal" /><PathStep number="02" icon={ShieldCheck} title="Sentra policy kernel" detail="returns a bounded decision" tone="brand" /><PathStep number="03" icon={FileCheck2} title="Vendor approval tool" detail={active ? "state changed after ALLOW" : "held until verified"} tone={active ? "green" : "neutral"} /></div>
           <div className="rule-notice"><LockKeyhole className="h-4 w-4" /><span>The workspace state is server-held. It changes only after a valid <b>ALLOW</b> and gateway check.</span></div>
-        </div><div className="scenario-console"><div className="console-head"><div><span className="eyebrow">Authority test suite</span><h3>Choose a scenario.</h3></div><div className="console-controls"><span className={`console-status ${apiUnavailable ? "status-offline" : ""}`}>{usingOfflineData ? "offline cache" : apiUnavailable ? "reconnecting" : "live database"}</span><span className="dashboard-freshness"><Clock3 className="h-3.5 w-3.5" />Last refreshed {freshnessLabel}</span><button type="button" className="demo-reset" disabled={runScenario.isPending || resetDemo.isPending || !apiReady} onClick={() => resetDemo.mutate()}><TimerReset className="h-3.5 w-3.5" />Reset baseline</button>{cachedDashboardAvailable ? <button type="button" className="cache-clear" onClick={clearOfflineCache}><X className="h-3.5 w-3.5" />Clear cache</button> : null}{lastFailedScenario ? <button type="button" className="scenario-retry" disabled={runScenario.isPending || !apiReady} onClick={() => { setActiveScenario(lastFailedScenario.scenario); runScenario.mutate(lastFailedScenario); }}><RefreshCw className="h-3.5 w-3.5" />Retry {lastFailedScenario.scenario}</button> : null}</div></div>
-          {apiUnavailable ? <div className="offline-notice" role="status"><WifiOff className="h-4 w-4" /><div><b>{usingOfflineData ? "Offline dashboard view" : "Waiting for live dashboard data"}</b><span>{usingOfflineData ? `Showing data last refreshed ${freshnessLabel}. Scenario controls remain locked until a fresh connection is verified.` : "No cache is available. Reconnect to view current authority evidence."}</span></div></div> : null}
+        </div><div className="scenario-console"><div className="console-head"><div><span className="eyebrow">Authority test suite</span><h3>Choose a scenario.</h3></div><div className="console-controls"><span className={`console-status ${apiUnavailable ? "status-offline" : ""}`}>{usingOfflineData ? "offline cache" : apiUnavailable ? "reconnecting" : "live database"}</span><span className="dashboard-freshness"><Clock3 className="h-3.5 w-3.5" />Last refreshed {freshnessLabel}</span><button type="button" className="refresh-now" disabled={!browserOnline || dashboard.isFetching} onClick={() => void refreshDashboard()}><RefreshCw className={`h-3.5 w-3.5 ${dashboard.isFetching ? "spin-icon" : ""}`} />Refresh now</button><button type="button" className="demo-reset" disabled={runScenario.isPending || resetDemo.isPending || !apiReady} onClick={() => resetDemo.mutate()}><TimerReset className="h-3.5 w-3.5" />Reset baseline</button>{cachedDashboardAvailable ? <button type="button" className="cache-clear" onClick={clearOfflineCache}><X className="h-3.5 w-3.5" />Clear cache</button> : null}{lastFailedScenario ? <button type="button" className="scenario-retry" disabled={runScenario.isPending || !apiReady} onClick={() => { setActiveScenario(lastFailedScenario.scenario); runScenario.mutate(lastFailedScenario); }}><RefreshCw className="h-3.5 w-3.5" />Retry {lastFailedScenario.scenario}</button> : null}</div></div>
+          {apiUnavailable ? <><div className="offline-notice" role="status"><WifiOff className="h-4 w-4" /><div><b>{usingOfflineData ? "Offline dashboard view" : cacheExpired ? "Offline cache expired" : "Waiting for live dashboard data"}</b><span>{usingOfflineData ? `Showing data last refreshed ${freshnessLabel}. Scenario controls remain locked until a fresh connection is verified.` : cacheExpired ? "The last offline snapshot exceeded the 15-minute retention window and was removed." : "No cache is available. Reconnect to view current authority evidence."}</span></div></div><OfflineDiagnostics browserOnline={browserOnline} dashboardError={dashboard.error?.message} isFetching={dashboard.isFetching} cacheAvailable={cachedDashboardAvailable} cacheExpired={cacheExpired} savedAt={offlineSnapshot?.savedAt} onRefresh={() => void refreshDashboard()} refreshDisabled={!browserOnline || dashboard.isFetching} /></> : null}
           <div className="scenario-grid">{scenarios.map(({ label, icon: Icon, note, tone }, index) => <button key={label} type="button" disabled={runScenario.isPending || !apiReady} onClick={() => { const attempt = createScenarioAttempt(label); setActiveScenario(label); setLastFailedScenario(null); runScenario.mutate(attempt); }} className={`scenario-button scenario-${tone} ${activeScenario === label ? "scenario-active" : ""}`}><span className="scenario-index">0{index + 1}</span><span className="scenario-icon"><Icon className="h-4 w-4" /></span><span className="scenario-content"><b>{label}</b><small>{note}</small></span><ChevronRight className="h-4 w-4 scenario-arrow" /></button>)}</div>
           <div className="decision-strip" aria-live="polite"><span>Latest verdict</span>{usingOfflineData ? <p>Offline cache active. This evidence is the last loaded dashboard state and cannot authorize actions.</p> : apiUnavailable ? <p>Connection is recovering. Scenario controls remain locked until Sentra reconnects.</p> : latest ? <><OutcomeBadge outcome={latest.outcome} /><p>{latest.gatewayResult}</p></> : <p>Select a test to create a persisted decision.</p>}</div>
         </div></div>
@@ -229,6 +263,7 @@ function GuidedDemoPanel({ prompt,onPromptChange,status,stepIndex,step,canStart,
     <ol className="guided-steps">{guidedDemoSteps.map((item,index) => <li key={item.title} className={index === stepIndex ? "guided-current" : index < stepIndex ? "guided-complete" : ""}><span>{String(index + 1).padStart(2, "0")}</span><b>{item.title}</b>{item.scenario ? <small>{item.scenario}</small> : <small>context</small>}</li>)}</ol>
   </aside>;
 }
+function OfflineDiagnostics({ browserOnline,dashboardError,isFetching,cacheAvailable,cacheExpired,savedAt,onRefresh,refreshDisabled }: { browserOnline:boolean; dashboardError?:string; isFetching:boolean; cacheAvailable:boolean; cacheExpired:boolean; savedAt?:number; onRefresh:()=>void; refreshDisabled:boolean }) { return <details className="offline-diagnostics" open><summary><Gauge className="h-4 w-4" />Connection diagnostics<span>{browserOnline ? "network available" : "browser offline"}</span></summary><div className="diagnostic-grid"><div><span>Browser</span><b>{browserOnline ? "Online" : "Offline"}</b></div><div><span>Authority API</span><b>{isFetching ? "Checking" : dashboardError ? "Unavailable" : "Awaiting retry"}</b></div><div><span>Snapshot</span><b>{cacheAvailable ? `Saved ${formatSnapshotAge(savedAt)} ago` : cacheExpired ? "Expired and removed" : "Not available"}</b></div></div><p>{dashboardError ? `Latest transport detail: ${dashboardError}` : browserOnline ? "Try Refresh now to request a fresh authority dashboard." : "Reconnect your network, then use Refresh now to fetch current authority evidence."}</p><button type="button" className="diagnostic-refresh" disabled={refreshDisabled} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5" />Refresh now</button></details>; }
 function HeroMetric({ value,label }: { value:string; label:string }) { return <div><b>{value}</b><span>{label}</span></div>; }
 function MetricLarge({ value,label,icon:Icon }: { value:string; label:string; icon:typeof Database }) { return <div className="metric-large"><Icon className="h-4 w-4" /><b>{value}</b><span>{label}</span></div>; }
 function OutcomeBadge({ outcome }: { outcome:"ALLOW"|"DENY"|"ESCALATE"|"FREEZE" }) { return <span className={`outcome-badge outcome-${outcome}`}><CircleDot className="h-3 w-3" />{outcome}</span>; }
