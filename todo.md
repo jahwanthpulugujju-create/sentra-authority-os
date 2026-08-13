@@ -45,3 +45,13 @@
 - [x] Validate motion interactions on desktop and mobile, retest live scenarios, and save the interactive refinement checkpoint.
 - [x] Save and verify the post-motion interactive refinement checkpoint.
 - [x] Run a final desktop and mobile smoke pass plus all six authority scenarios against the saved motion state.
+- [x] Extract the supplied DEMUX workbook scoring structure and Sentra rank for a verified comparison.
+- [x] Compare Sentra with the highest-ranked and closest competing submissions by workbook criterion.
+- [x] Deliver a workbook-based Sentra gap analysis with practical presentation and MVP priorities.
+- [x] Send the verified workbook-based Sentra comparison report to the user.
+- [x] Extract and map the uploaded source abstracts for the workbook’s top 75 submissions.
+- [x] Compare Sentra with the top 75 across innovation, feasibility, impact, clarity, and technical depth.
+- [x] Deliver a transparent top-75 Sentra comparison with the strongest competitive threats and specific proof priorities.
+- [x] Add source-supported strongest-threat and concrete Round 2 proof-priority guidance to the top-75 report.
+- [ ] Send the completed top-75 Sentra comparison report to the user with its evidence limits stated clearly.
+- [x] Apply and document neutrality controls: fixed workbook rubric, source-linked claims, explicit uncertainty labels, and no automatic credit for Sentra’s later MVP.
