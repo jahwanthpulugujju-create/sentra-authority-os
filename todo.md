@@ -53,5 +53,10 @@
 - [x] Compare Sentra with the top 75 across innovation, feasibility, impact, clarity, and technical depth.
 - [x] Deliver a transparent top-75 Sentra comparison with the strongest competitive threats and specific proof priorities.
 - [x] Add source-supported strongest-threat and concrete Round 2 proof-priority guidance to the top-75 report.
-- [ ] Send the completed top-75 Sentra comparison report to the user with its evidence limits stated clearly.
+- [x] Send the completed top-75 Sentra comparison report to the user with its evidence limits stated clearly.
+- [x] Define a non-guaranteed, evidence-based winner-readiness standard for Sentra against the top-75 field.
+- [x] Create a detailed backend, frontend, proof, automation, repository, and testing checklist for the Sentra MVP.
+- [x] Define a distinctive light-mode product UX and motion direction that avoids generic dark AI-dashboard styling.
+- [x] Write a judge-demo runbook, failure plan, and final submission checklist ordered by priority.
+- [ ] Deliver the complete Sentra winner-readiness playbook to the user.
 - [x] Apply and document neutrality controls: fixed workbook rubric, source-linked claims, explicit uncertainty labels, and no automatic credit for Sentra’s later MVP.
