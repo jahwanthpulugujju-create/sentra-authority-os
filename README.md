@@ -64,7 +64,17 @@ pnpm check
 pnpm build
 ```
 
-The test suite covers stable canonicalization, required policy outcomes, the rule that only `ALLOW` may change protected execution state, capability-to-request hash binding, and hash-linked evidence records.
+The test suite covers stable canonicalization, required policy outcomes, the rule that only `ALLOW` may change protected execution state, exact capability-to-request hash binding, altered signature refusal, expiry refusal, changed-request refusal, and hash-linked evidence sensitivity.
+
+### Repeatable judge-demo verification
+
+With the local application running, run the complete real API verification pass:
+
+```bash
+./verify-demo.sh
+```
+
+The script resets the demo baseline, executes all six scenarios through the server, verifies one allowed state change and five refused paths, then confirms a valid six-record proof chain. This is a reproducible demo check, not an external security certification.
 
 ## Round 2 deliverables
 
@@ -74,6 +84,8 @@ The test suite covers stable canonicalization, required policy outcomes, the rul
 | Working MVP | Persistent fullstack application with live scenario controls and database-backed state. |
 | Progress update | [`progress-update.md`](./progress-update.md) |
 | Live demo | [`demo-script.md`](./demo-script.md) |
+| Professional readiness review | [`SENTRA_PROFESSIONAL_REVIEW.md`](./SENTRA_PROFESSIONAL_REVIEW.md) |
+| 100-day team operating plan | [`SENTRA_100_DAY_OPERATING_PLAN.md`](./SENTRA_100_DAY_OPERATING_PLAN.md) |
 
 ## Scope and limitations
 

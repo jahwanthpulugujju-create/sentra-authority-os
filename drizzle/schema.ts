@@ -26,6 +26,20 @@ export const protectedResources = mysqlTable("protected_resources", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const capabilities = mysqlTable("capabilities", {
+  id: int("id").autoincrement().primaryKey(),
+  capabilityId: varchar("capabilityId", { length: 96 }).notNull().unique(),
+  resourceId: int("resourceId").notNull(),
+  requestHash: varchar("requestHash", { length: 64 }).notNull(),
+  payload: text("payload").notNull(),
+  signature: varchar("signature", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["ISSUED", "CONSUMED", "EXPIRED", "REJECTED"]).notNull().default("ISSUED"),
+  issuedAt: timestamp("issuedAt").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  consumedAt: timestamp("consumedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const authorityEvents = mysqlTable("authority_events", {
   id: int("id").autoincrement().primaryKey(),
   eventId: varchar("eventId", { length: 64 }).notNull().unique(),
@@ -48,4 +62,5 @@ export const authorityEvents = mysqlTable("authority_events", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type ProtectedResource = typeof protectedResources.$inferSelect;
+export type Capability = typeof capabilities.$inferSelect;
 export type AuthorityEvent = typeof authorityEvents.$inferSelect;

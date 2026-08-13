@@ -58,5 +58,10 @@
 - [x] Create a detailed backend, frontend, proof, automation, repository, and testing checklist for the Sentra MVP.
 - [x] Define a distinctive light-mode product UX and motion direction that avoids generic dark AI-dashboard styling.
 - [x] Write a judge-demo runbook, failure plan, and final submission checklist ordered by priority.
-- [ ] Deliver the complete Sentra winner-readiness playbook to the user.
+- [x] Deliver the complete Sentra winner-readiness playbook to the user.
 - [x] Apply and document neutrality controls: fixed workbook rubric, source-linked claims, explicit uncertainty labels, and no automatic credit for Sentra’s later MVP.
+- [x] Audit the current codebase against the approved winner-readiness playbook and document every verifiable gap.
+- [x] Implement the highest-impact backend enforcement, capability, proof-chain, and test gaps found by the audit.
+- [x] Implement the highest-impact frontend evidence, reset, demo-safety, repository, and review-documentation gaps found by the audit.
+- [x] Run automated tests, adversarial checks, production build, and responsive review on the upgraded implementation.
+- [ ] Deliver an honest professional readiness report and a 100-day team operating plan with human validation gates.

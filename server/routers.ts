@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { authorityEvents, protectedResources } from "../drizzle/schema";
-import { buildCapability, buildRecordHash, buildScenarioDecision, scenarioLabels, sha256, stableStringify } from "./authority";
-import { ensureProtectedResource, getDemoMetrics, getLatestEvent, getRequiredDb, listAuthorityEvents, refreshResourceContext } from "./sentraDb";
+import { authorityEvents, capabilities, protectedResources } from "../drizzle/schema";
+import { buildCapability, buildRecordHash, buildScenarioDecision, scenarioLabels, sha256, stableStringify, verifyCapability, type SignedCapability } from "./authority";
+import { ensureProtectedResource, getDemoMetrics, getRequiredDb, listAuthorityEvents, refreshResourceContext, verifyProofChain } from "./sentraDb";
 import { COOKIE_NAME } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -26,33 +26,75 @@ export const appRouter = router({
   authority: router({
     dashboard: publicProcedure.query(async () => {
       const resource = await ensureProtectedResource();
-      const [events, metrics] = await Promise.all([listAuthorityEvents(), getDemoMetrics()]);
-      return { resource, metrics, events: events.map(serializeEvent) };
+      const [events, metrics, proofIntegrity] = await Promise.all([listAuthorityEvents(), getDemoMetrics(), verifyProofChain()]);
+      return { resource, metrics, proofIntegrity, events: events.map(serializeEvent) };
     }),
     refreshContext: publicProcedure.mutation(async () => ({ resource: await refreshResourceContext() })),
+    resetDemo: publicProcedure.mutation(async () => {
+      const db = await getRequiredDb();
+      const resource = await ensureProtectedResource();
+      await db.transaction(async tx => {
+        await tx.delete(capabilities);
+        await tx.delete(authorityEvents);
+        await tx.update(protectedResources).set({ executionState: 0, contextScore: 72, lastCheckedAt: new Date() }).where(eq(protectedResources.id, resource.id));
+      });
+      const [resetResource] = await db.select().from(protectedResources).where(eq(protectedResources.id, resource.id)).limit(1);
+      return { resource: resetResource };
+    }),
     runScenario: publicProcedure.input(z.object({ scenario: z.enum(scenarioLabels) })).mutation(async ({ input }) => {
       const db = await getRequiredDb();
       const resource = await ensureProtectedResource();
-      const previous = await getLatestEvent();
+      const now = new Date();
       const eventId = `evt_${nanoid(12)}`;
       const requestId = `req_${nanoid(12)}`;
-      const replayNonce = previous?.outcome === "ALLOW" ? JSON.parse(previous.canonicalRequest).nonce : undefined;
-      const decision = buildScenarioDecision(input.scenario, resource.contextScore, requestId, replayNonce);
+      const decision = buildScenarioDecision(input.scenario, resource.contextScore, requestId);
       const canonicalRequest = stableStringify(decision.request);
       const requestHash = sha256(canonicalRequest);
-      const capability = decision.outcome === "ALLOW" ? buildCapability(decision.request, requestHash) : decision.capabilityPayload ? { ...decision.capabilityPayload, signature: "ORIGINAL_CAPABILITY_REFERENCE" } : null;
-      const capabilityJson = capability ? stableStringify(capability) : null;
-      const capabilityHash = capabilityJson ? sha256(capabilityJson) : null;
-      const previousHash = previous?.recordHash || "GENESIS";
-      const recordHash = buildRecordHash({ previousHash, eventId, scenario: input.scenario, outcome: decision.outcome, requestHash, capabilityHash, gatewayResult: decision.gatewayResult, executionResult: decision.executionResult });
 
-      await db.insert(authorityEvents).values({
-        eventId, scenario: input.scenario, outcome: decision.outcome, requestId, resourceId: resource.id, canonicalRequest, requestHash, capability: capabilityJson, capabilityHash, gatewayResult: decision.gatewayResult, executionResult: decision.executionResult, executionChanged: decision.executionMayChange ? 1 : 0, previousHash, recordHash,
+      const transactionResult = await db.transaction(async tx => {
+        const latestRows = await tx.select().from(authorityEvents).orderBy(desc(authorityEvents.id)).limit(1);
+        const previousHash = latestRows[0]?.recordHash || "GENESIS";
+        let capability: SignedCapability | null = null;
+        let gatewayResult = decision.gatewayResult;
+        let executionResult = decision.executionResult;
+        let executionChanged = 0;
+
+        if (input.scenario === "Changed Request" && decision.approvalRequest) {
+          const approvedHash = sha256(stableStringify(decision.approvalRequest));
+          capability = buildCapability(decision.approvalRequest, approvedHash, now);
+          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash: approvedHash, payload: stableStringify(capability), signature: capability.signature, status: "ISSUED", issuedAt: now, expiresAt: new Date(capability.expiry) });
+          const verification = verifyCapability(capability, decision.request, requestHash, now.getTime());
+          gatewayResult = `REJECTED: ${verification.reason}`;
+          await tx.update(capabilities).set({ status: "REJECTED" }).where(eq(capabilities.capabilityId, capability.capabilityId));
+        } else if (input.scenario === "Replay Attempt") {
+          capability = buildCapability(decision.request, requestHash, now);
+          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash, payload: stableStringify(capability), signature: capability.signature, status: "CONSUMED", issuedAt: now, expiresAt: new Date(capability.expiry), consumedAt: now });
+          gatewayResult = "REJECTED: CAPABILITY_ALREADY_CONSUMED";
+        } else if (decision.outcome === "ALLOW") {
+          capability = buildCapability(decision.request, requestHash, now);
+          await tx.insert(capabilities).values({ capabilityId: capability.capabilityId, resourceId: resource.id, requestHash, payload: stableStringify(capability), signature: capability.signature, status: "ISSUED", issuedAt: now, expiresAt: new Date(capability.expiry) });
+          const verification = verifyCapability(capability, decision.request, requestHash, now.getTime());
+          if (!verification.valid) {
+            gatewayResult = `REJECTED: ${verification.reason}`;
+            executionResult = "NOT EXECUTED: gateway verification failed";
+            await tx.update(capabilities).set({ status: "REJECTED" }).where(eq(capabilities.capabilityId, capability.capabilityId));
+          } else {
+            await tx.update(capabilities).set({ status: "CONSUMED", consumedAt: now }).where(eq(capabilities.capabilityId, capability.capabilityId));
+            await tx.update(protectedResources).set({ executionState: decision.request.desiredState === "APPROVED" ? 1 : 0, lastCheckedAt: now }).where(eq(protectedResources.id, resource.id));
+            gatewayResult = "VERIFIED: signature, exact request hash, scope, policy version, expiry, and nonce are valid";
+            executionResult = "EXECUTED: protected vendor approval was committed by the workspace tool";
+            executionChanged = 1;
+          }
+        }
+
+        const capabilityJson = capability ? stableStringify(capability) : null;
+        const capabilityHash = capabilityJson ? sha256(capabilityJson) : null;
+        const recordHash = buildRecordHash({ previousHash, eventId, scenario: input.scenario, outcome: decision.outcome, requestHash, capabilityHash, gatewayResult, executionResult });
+        await tx.insert(authorityEvents).values({ eventId, scenario: input.scenario, outcome: decision.outcome, requestId, resourceId: resource.id, canonicalRequest, requestHash, capability: capabilityJson, capabilityHash, gatewayResult, executionResult, executionChanged, previousHash, recordHash });
+        return { eventId };
       });
-      if (decision.outcome === "ALLOW" && decision.executionMayChange) {
-        await db.update(protectedResources).set({ executionState: decision.request.desiredState === "APPROVED" ? 1 : 0, lastCheckedAt: new Date() }).where(eq(protectedResources.id, resource.id));
-      }
-      const [storedEvent] = await db.select().from(authorityEvents).where(eq(authorityEvents.eventId, eventId)).limit(1);
+
+      const [storedEvent] = await db.select().from(authorityEvents).where(eq(authorityEvents.eventId, transactionResult.eventId)).limit(1);
       const [updatedResource] = await db.select().from(protectedResources).where(eq(protectedResources.id, resource.id)).limit(1);
       return { event: serializeEvent(storedEvent), resource: updatedResource };
     }),

@@ -1,5 +1,6 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { authorityEvents, protectedResources, type ProtectedResource } from "../drizzle/schema";
+import { buildRecordHash } from "./authority";
 import { getDb } from "./db";
 
 export async function getRequiredDb() {
@@ -12,16 +13,7 @@ export async function ensureProtectedResource(): Promise<ProtectedResource> {
   const db = await getRequiredDb();
   const existing = await db.select().from(protectedResources).where(eq(protectedResources.resourceKey, "vendor-intake-contoso")).limit(1);
   if (existing[0]) return existing[0];
-  await db.insert(protectedResources).values({
-    resourceKey: "vendor-intake-contoso",
-    name: "Contoso vendor approval",
-    toolType: "protected workspace tool",
-    workspace: "Procurement Operations",
-    available: 1,
-    executionState: 0,
-    contextScore: 72,
-    lastCheckedAt: new Date(),
-  });
+  await db.insert(protectedResources).values({ resourceKey: "vendor-intake-contoso", name: "Contoso vendor approval", toolType: "protected workspace tool", workspace: "Procurement Operations", available: 1, executionState: 0, contextScore: 72, lastCheckedAt: new Date() });
   const created = await db.select().from(protectedResources).where(eq(protectedResources.resourceKey, "vendor-intake-contoso")).limit(1);
   if (!created[0]) throw new Error("Unable to create the protected demo resource.");
   return created[0];
@@ -44,6 +36,18 @@ export async function getLatestEvent() {
 export async function listAuthorityEvents(limit = 12) {
   const db = await getRequiredDb();
   return db.select().from(authorityEvents).orderBy(desc(authorityEvents.id)).limit(limit);
+}
+
+export async function verifyProofChain() {
+  const db = await getRequiredDb();
+  const events = await db.select().from(authorityEvents).orderBy(asc(authorityEvents.id));
+  let expectedPreviousHash = "GENESIS";
+  for (const event of events) {
+    const recomputed = buildRecordHash({ previousHash: expectedPreviousHash, eventId: event.eventId, scenario: event.scenario, outcome: event.outcome, requestHash: event.requestHash, capabilityHash: event.capabilityHash, gatewayResult: event.gatewayResult, executionResult: event.executionResult });
+    if (event.previousHash !== expectedPreviousHash || event.recordHash !== recomputed) return { valid: false, checkedEvents: events.length, failedEventId: event.eventId };
+    expectedPreviousHash = event.recordHash;
+  }
+  return { valid: true, checkedEvents: events.length, failedEventId: null as string | null };
 }
 
 export async function getDemoMetrics() {
