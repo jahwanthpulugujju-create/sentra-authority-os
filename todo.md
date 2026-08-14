@@ -112,3 +112,17 @@
 - [x] Deliver a completed-versus-human-gated roadmap execution report with limitations stated plainly.
 - [x] Commit and push the completed Sentra 46-plus roadmap implementation to GitHub with Jahwanth recorded as the author.
 - [x] Verify and correct attribution for affected Sentra commits so the Git history is recorded under the user’s GitHub identity before synchronization.
+- [x] Perform and document a final-round website, demo, code, and GitHub submission-readiness audit; fix only confirmed blockers or polish defects.
+- [x] Create a structured final-round website-demo script, fallback version, judge-question responses, and presenter do-not-claim guidance.
+- [x] Add subtle loading, hover, focus, and press feedback to the primary website-demo controls while preserving reduced-motion support.
+- [x] Add subtle completed-action toast feedback and a copy-to-clipboard control for locally generated proof results with accessible fallback handling.
+- [x] Inspect and configure ntfy notification delivery as a randomized outcome-only controlled-demo channel, with the non-production scope documented.
+- [x] Add reset, distinct success/error toast presentation, and email-sharing controls for local proof results without altering authority behavior.
+- [ ] Create a branded 90-second futuristic Sentra motion-graphics video suitable for the final-round presentation and document its intended use.
+- [x] Use a randomized ntfy.sh topic only as a controlled demo channel, with no proof payload sent to an unauthenticated public topic.
+- [x] Create a generator-ready nine-shot, 90-second Sentra motion-graphics storyboard while video generation is unavailable under the current quota.
+- [x] Create and deliver the exact nine-clip Sentra video-generation prompt pack with settings and assembly order for user-run rendering.
+- [x] Create and deliver the exact nine-clip Sentra video-generation prompt pack with settings and assembly order for user-run rendering.
+- [x] Create a detailed, simple, storytelling final-round pitch script with exact website actions, timing, judge explanations, and rehearsal guidance.
+- [ ] Commit and push the remaining verified Sentra changes under Jahwanth’s GitHub identity.
+- [ ] Prepare a Vercel-compatible deployment handoff with documented managed environment variables and user-owned publication steps.

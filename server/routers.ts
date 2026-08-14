@@ -6,6 +6,7 @@ import { buildCapability, buildEscalationApproval, buildRecordHash, buildScenari
 import { listKeyHistory } from "./keys";
 import { ACTIVE_POLICY_VERSION, listPolicyHistory, reasonCodeDescriptions } from "./policy";
 import { buildProofExportPackage } from "./proofExport";
+import { getNtfyDemoStatus, publishNtfyDemoAlert } from "./ntfy";
 import { authorizeProtectedVendorApproval, executeProtectedVendorApproval } from "./protectedTool";
 import { ensureProtectedResource, expireStaleCapabilities, getDemoMetrics, getRequiredDb, listAuthorityEvents, refreshResourceContext, verifyProofChain } from "./sentraDb";
 import { COOKIE_NAME } from "../shared/const";
@@ -38,6 +39,14 @@ export const appRouter = router({
       await expireStaleCapabilities();
       const [events, metrics, proofIntegrity] = await Promise.all([listAuthorityEvents(500), getDemoMetrics(), verifyProofChain()]);
       return buildProofExportPackage({ proofIntegrity, metrics, policies: listPolicyHistory(), keys: listKeyHistory(), events: events.reverse().map(serializeEvent) });
+    }),
+    ntfyStatus: publicProcedure.query(() => getNtfyDemoStatus()),
+    notifyNtfy: publicProcedure.mutation(async () => {
+      const [latestEvent] = await listAuthorityEvents(1);
+      if (!latestEvent) throw new Error("Run a Sentra scenario before sending a demo notification.");
+      const delivery = await publishNtfyDemoAlert({ outcome: latestEvent.outcome, reasonCode: latestEvent.reasonCode, eventId: latestEvent.eventId });
+      if (!delivery.delivered) throw new Error(`ntfy did not accept the demo notification (HTTP ${delivery.status}).`);
+      return delivery;
     }),
     refreshContext: publicProcedure.mutation(async () => ({ resource: await refreshResourceContext() })),
     resetDemo: publicProcedure.mutation(async () => {
