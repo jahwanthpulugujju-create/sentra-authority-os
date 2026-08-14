@@ -124,5 +124,5 @@
 - [x] Create and deliver the exact nine-clip Sentra video-generation prompt pack with settings and assembly order for user-run rendering.
 - [x] Create and deliver the exact nine-clip Sentra video-generation prompt pack with settings and assembly order for user-run rendering.
 - [x] Create a detailed, simple, storytelling final-round pitch script with exact website actions, timing, judge explanations, and rehearsal guidance.
-- [ ] Commit and push the remaining verified Sentra changes under Jahwanth’s GitHub identity.
+- [x] Commit and push the remaining verified Sentra changes under Jahwanth’s GitHub identity.
 - [x] Prepare a Vercel-compatible deployment handoff with an Express serverless adapter, build configuration, documented managed environment variables, and user-owned publication steps.
