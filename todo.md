@@ -135,3 +135,4 @@
 - [x] Require a reviewer-held code that is never delivered through ntfy before a mobile escalation can be approved or denied.
 - [x] Add automated coverage for mobile review code rejection, one-time resolution, expiry, and evidence-chain preservation.
 - [x] Update the mobile review instructions to distinguish ntfy delivery from reviewer authority clearly.
+- [x] Fix the DecisionRow renderer so mobile-review evidence events with no capability render safely in the live dashboard.
