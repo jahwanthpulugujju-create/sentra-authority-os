@@ -110,3 +110,5 @@
 - [x] Expand automated/adversarial coverage and validate the upgraded demo, recovery path, proof chain, responsive presentation, build, and proof-package export.
 - [x] Prepare explicit human-owned gates for interviews, source-backed market validation, final-machine rehearsal, backup recording, and claim approval.
 - [x] Deliver a completed-versus-human-gated roadmap execution report with limitations stated plainly.
+- [ ] Commit and push the completed Sentra 46-plus roadmap implementation to GitHub with Jahwanth recorded as the author.
+- [ ] Verify and correct attribution for affected Sentra commits so the Git history is recorded under the user’s GitHub identity before synchronization.
