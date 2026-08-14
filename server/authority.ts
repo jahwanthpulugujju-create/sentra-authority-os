@@ -74,6 +74,7 @@ export type ScenarioDecision = {
 
 export type EscalationApproval = {
   approvalId: string;
+  reviewId: string;
   state: "PENDING_REVIEW";
   requiredApproverRole: "procurement-controller";
   originalRequestHash: string;
@@ -93,6 +94,14 @@ export function stableStringify(value: unknown): string {
 
 export function sha256(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+export function createReviewerCode(): string {
+  return crypto.randomBytes(4).toString("hex").toUpperCase();
+}
+
+export function hashReviewerCode(code: string): string {
+  return sha256(`sentra-mobile-review:${code.trim().toUpperCase()}`);
 }
 
 function signingPayload(payload: CapabilityPayload | SignedCapability): CapabilityPayload {
@@ -208,9 +217,10 @@ export function buildCapability(request: AuthorityRequest, requestHash: string, 
   return { ...payload, signature: signCapability(payload) };
 }
 
-export function buildEscalationApproval(request: AuthorityRequest, requestHash: string, now = new Date()): EscalationApproval {
+export function buildEscalationApproval(request: AuthorityRequest, requestHash: string, now = new Date(), reviewId = `review-${request.requestId}`): EscalationApproval {
   return {
     approvalId: `apr-${request.requestId}`,
+    reviewId,
     state: "PENDING_REVIEW",
     requiredApproverRole: "procurement-controller",
     originalRequestHash: requestHash,

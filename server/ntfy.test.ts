@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getNtfyDemoStatus, publishNtfyDemoAlert } from "./ntfy";
+import { getNtfyDemoStatus, publishNtfyDemoAlert, shouldNotifyPhoneForOutcome } from "./ntfy";
 
 describe("ntfy controlled demo channel", () => {
   it("creates an ephemeral randomized topic and documents that proof payloads remain local", () => {
@@ -10,15 +10,33 @@ describe("ntfy controlled demo channel", () => {
     expect(status.subscribeUrl).toBe(`https://ntfy.sh/${status.topic}`);
   });
 
-  it("publishes only a high-level outcome summary", async () => {
+  it("reserves phone delivery for the single ESCALATE outcome", () => {
+    expect(shouldNotifyPhoneForOutcome("ESCALATE")).toBe(true);
+    expect(shouldNotifyPhoneForOutcome("ALLOW")).toBe(false);
+    expect(shouldNotifyPhoneForOutcome("DENY")).toBe(false);
+    expect(shouldNotifyPhoneForOutcome("FREEZE")).toBe(false);
+  });
+
+  it("publishes only a high-level escalation summary", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal("fetch", fetchMock);
-    const result = await publishNtfyDemoAlert({ outcome: "DENY", reasonCode: "REQUEST_HASH_MISMATCH", eventId: "evt_demo" });
+    const result = await publishNtfyDemoAlert({ outcome: "ESCALATE" });
     expect(result.delivered).toBe(true);
+    expect(result.skipped).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("https://ntfy.sh/sentra-demo-"), expect.objectContaining({
       method: "POST",
-      body: "Local Sentra authority event evt_demo completed with DENY (REQUEST_HASH_MISMATCH). Open the Sentra demo to inspect the local proof record.",
+      body: "Sentra escalated an untrusted instruction for human review. Open the Sentra demo to inspect the local proof record.",
     }));
+    vi.unstubAllGlobals();
+  });
+
+  it("does not contact ntfy for any non-escalation outcome", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await publishNtfyDemoAlert({ outcome: "DENY" });
+    expect(result.delivered).toBe(false);
+    expect(result.skipped).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });

@@ -1,12 +1,13 @@
 import { desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { authorityEvents, capabilities, protectedResources } from "../drizzle/schema";
-import { buildCapability, buildEscalationApproval, buildRecordHash, buildScenarioDecision, scenarioLabels, sha256, stableStringify, verifyCapability, type SignedCapability } from "./authority";
+import { authorityEvents, capabilities, escalationReviews, protectedResources } from "../drizzle/schema";
+import { buildCapability, buildEscalationApproval, buildRecordHash, buildScenarioDecision, createReviewerCode, hashReviewerCode, scenarioLabels, sha256, stableStringify, verifyCapability, type EscalationApproval, type SignedCapability } from "./authority";
 import { listKeyHistory } from "./keys";
 import { ACTIVE_POLICY_VERSION, listPolicyHistory, reasonCodeDescriptions } from "./policy";
 import { buildProofExportPackage } from "./proofExport";
-import { getNtfyDemoStatus, publishNtfyDemoAlert } from "./ntfy";
+import { getNtfyDemoStatus, publishNtfyDemoAlert, shouldNotifyPhoneForOutcome } from "./ntfy";
+import { validateMobileReviewResolution } from "./mobileReview";
 import { authorizeProtectedVendorApproval, executeProtectedVendorApproval } from "./protectedTool";
 import { ensureProtectedResource, expireStaleCapabilities, getDemoMetrics, getRequiredDb, listAuthorityEvents, refreshResourceContext, verifyProofChain } from "./sentraDb";
 import { COOKIE_NAME } from "../shared/const";
@@ -16,6 +17,18 @@ import { publicProcedure, router } from "./_core/trpc";
 
 function serializeEvent(event: typeof authorityEvents.$inferSelect) {
   return { ...event, canonicalRequest: JSON.parse(event.canonicalRequest), capability: event.capability ? JSON.parse(event.capability) : null, approval: event.approval ? JSON.parse(event.approval) : null };
+}
+
+function getPublicOrigin(req: { protocol?: string; get(name: string): string | undefined }) {
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "https";
+  const host = req.get("x-forwarded-host") || req.get("host");
+  if (!host) throw new Error("A public review link could not be created for this request.");
+  return `${protocol}://${host}`;
+}
+
+function parseEscalationApproval(event: typeof authorityEvents.$inferSelect): EscalationApproval {
+  if (!event.approval) throw new Error("This authority event has no review artifact.");
+  return JSON.parse(event.approval) as EscalationApproval;
 }
 
 export const appRouter = router({
@@ -41,18 +54,56 @@ export const appRouter = router({
       return buildProofExportPackage({ proofIntegrity, metrics, policies: listPolicyHistory(), keys: listKeyHistory(), events: events.reverse().map(serializeEvent) });
     }),
     ntfyStatus: publicProcedure.query(() => getNtfyDemoStatus()),
-    notifyNtfy: publicProcedure.mutation(async () => {
-      const [latestEvent] = await listAuthorityEvents(1);
-      if (!latestEvent) throw new Error("Run a Sentra scenario before sending a demo notification.");
-      const delivery = await publishNtfyDemoAlert({ outcome: latestEvent.outcome, reasonCode: latestEvent.reasonCode, eventId: latestEvent.eventId });
-      if (!delivery.delivered) throw new Error(`ntfy did not accept the demo notification (HTTP ${delivery.status}).`);
-      return delivery;
+    mobileReview: publicProcedure.input(z.object({ eventId: z.string().min(1), token: z.string().min(16) })).query(async ({ input }) => {
+      const db = await getRequiredDb();
+      const [review] = await db.select().from(escalationReviews).where(eq(escalationReviews.eventId, input.eventId)).limit(1);
+      const [event] = await db.select().from(authorityEvents).where(eq(authorityEvents.eventId, input.eventId)).limit(1);
+      if (!review || !event || review.tokenHash !== sha256(input.token)) throw new Error("This mobile review link is invalid.");
+      const approval = parseEscalationApproval(event);
+      return {
+        reviewId: review.reviewId,
+        status: review.status,
+        expiresAt: review.expiresAt,
+        resolvedAt: review.resolvedAt,
+        scenario: event.scenario,
+        reasonCode: event.reasonCode,
+        originalAction: "The original untrusted request remains blocked. A phone decision resolves the review only.",
+        canResolve: review.status === "PENDING" && review.expiresAt.getTime() > Date.now(),
+        approverRole: approval.requiredApproverRole,
+      };
+    }),
+    resolveMobileReview: publicProcedure.input(z.object({ eventId: z.string().min(1), token: z.string().min(16), reviewerCode: z.string().min(8).max(16), decision: z.enum(["APPROVED", "DENIED"]) })).mutation(async ({ input }) => {
+      const db = await getRequiredDb();
+      const now = new Date();
+      return db.transaction(async tx => {
+        const [review] = await tx.select().from(escalationReviews).where(eq(escalationReviews.eventId, input.eventId)).limit(1);
+        const [event] = await tx.select().from(authorityEvents).where(eq(authorityEvents.eventId, input.eventId)).limit(1);
+        if (!review || !event) throw new Error("This mobile review link is invalid.");
+        const gate = validateMobileReviewResolution(review, input.token, input.reviewerCode, now.getTime());
+        if (!gate.valid && gate.reason === "INVALID_LINK") throw new Error("This mobile review link is invalid.");
+        if (!gate.valid && gate.reason === "REVIEWER_CODE_REJECTED") throw new Error("The reviewer code is incorrect. Enter the code shown in the Sentra dashboard, not the ntfy notification.");
+        if (!gate.valid && gate.reason === "REVIEW_ALREADY_RESOLVED") throw new Error(`This review was already resolved as ${review.status}.`);
+        if (!gate.valid && gate.reason === "REVIEW_EXPIRED") throw new Error("This mobile review link has expired.");
+        const approval = parseEscalationApproval(event);
+        const [latestRecord] = await tx.select().from(authorityEvents).orderBy(desc(authorityEvents.id)).limit(1);
+        const reviewEventId = `rev_${nanoid(12)}`;
+        const resolutionRequest = stableStringify({ type: "MOBILE_ESCALATION_REVIEW", reviewId: review.reviewId, originalEventId: event.eventId, originalRequestHash: event.requestHash, decision: input.decision, resolvedAt: now.toISOString() });
+        const reasonCode = input.decision === "APPROVED" ? "MOBILE_REVIEW_APPROVED" : "MOBILE_REVIEW_DENIED";
+        const gatewayResult = input.decision === "APPROVED" ? "REVIEW CLOSED: phone approval recorded; the original untrusted action remains blocked" : "REVIEW CLOSED: phone denial recorded; the original untrusted action remains blocked";
+        const executionResult = "NOT EXECUTED: any future action requires a fresh trusted request and new authority decision";
+        const approvalHash = event.approvalHash || sha256(stableStringify(approval));
+        const recordHash = buildRecordHash({ previousHash: latestRecord?.recordHash || "GENESIS", eventId: reviewEventId, scenario: "Mobile Review", outcome: "ESCALATE", requestHash: sha256(resolutionRequest), capabilityHash: null, approvalHash, gatewayResult, executionResult, reasonCode });
+        await tx.update(escalationReviews).set({ status: input.decision, resolvedAt: now }).where(eq(escalationReviews.id, review.id));
+        await tx.insert(authorityEvents).values({ eventId: reviewEventId, scenario: "Mobile Review", outcome: "ESCALATE", requestId: `review-${review.reviewId}`, resourceId: event.resourceId, canonicalRequest: resolutionRequest, requestHash: sha256(resolutionRequest), policyVersion: event.policyVersion, reasonCode, capability: null, capabilityHash: null, approval: event.approval, approvalHash, gatewayResult, executionResult, executionChanged: 0, decisionLatencyMs: 0, previousHash: latestRecord?.recordHash || "GENESIS", recordHash });
+        return { reviewId: review.reviewId, status: input.decision, message: input.decision === "APPROVED" ? "Review approved. The original untrusted action remains blocked and must be resubmitted as a new trusted request." : "Review denied. The original untrusted action remains blocked." };
+      });
     }),
     refreshContext: publicProcedure.mutation(async () => ({ resource: await refreshResourceContext() })),
     resetDemo: publicProcedure.mutation(async () => {
       const db = await getRequiredDb();
       const resource = await ensureProtectedResource();
       await db.transaction(async tx => {
+        await tx.delete(escalationReviews);
         await tx.delete(capabilities);
         await tx.delete(authorityEvents);
         await tx.update(protectedResources).set({ executionState: 0, contextScore: 72, lastCheckedAt: new Date() }).where(eq(protectedResources.id, resource.id));
@@ -60,7 +111,7 @@ export const appRouter = router({
       const [resetResource] = await db.select().from(protectedResources).where(eq(protectedResources.id, resource.id)).limit(1);
       return { resource: resetResource };
     }),
-    runScenario: publicProcedure.input(z.object({ scenario: z.enum(scenarioLabels), idempotencyKey: z.string().min(8).max(48).optional() })).mutation(async ({ input }) => {
+    runScenario: publicProcedure.input(z.object({ scenario: z.enum(scenarioLabels), idempotencyKey: z.string().min(8).max(48).optional() })).mutation(async ({ input, ctx }) => {
       const startedAt = Date.now();
       const db = await getRequiredDb();
       const resource = await ensureProtectedResource();
@@ -74,6 +125,9 @@ export const appRouter = router({
       const decision = buildScenarioDecision(input.scenario, resource.contextScore, requestId, input.idempotencyKey || requestId);
       const canonicalRequest = stableStringify(decision.request);
       const requestHash = sha256(canonicalRequest);
+      const mobileReviewToken = input.scenario === "Prompt Injection" ? nanoid(32) : null;
+      const mobileReviewId = mobileReviewToken ? `review-${nanoid(12)}` : null;
+      const reviewerCode = mobileReviewToken ? createReviewerCode() : null;
 
       const transactionResult = await db.transaction(async tx => {
         const latestRows = await tx.select().from(authorityEvents).orderBy(desc(authorityEvents.id)).limit(1);
@@ -85,7 +139,9 @@ export const appRouter = router({
         let approvalJson: string | null = null;
 
         if (input.scenario === "Prompt Injection") {
-          approvalJson = stableStringify(buildEscalationApproval(decision.request, requestHash, now));
+          const approval = buildEscalationApproval(decision.request, requestHash, now, mobileReviewId!);
+          approvalJson = stableStringify(approval);
+          await tx.insert(escalationReviews).values({ reviewId: mobileReviewId!, eventId, tokenHash: sha256(mobileReviewToken!), reviewerCodeHash: hashReviewerCode(reviewerCode!), status: "PENDING", expiresAt: new Date(approval.expiresAt) });
         } else if (input.scenario === "Changed Request" && decision.approvalRequest) {
           const approvedHash = sha256(stableStringify(decision.approvalRequest));
           capability = buildCapability(decision.approvalRequest, approvedHash, now);
@@ -126,7 +182,11 @@ export const appRouter = router({
 
       const [storedEvent] = await db.select().from(authorityEvents).where(eq(authorityEvents.eventId, transactionResult.eventId)).limit(1);
       const [updatedResource] = await db.select().from(protectedResources).where(eq(protectedResources.id, resource.id)).limit(1);
-      return { event: serializeEvent(storedEvent), resource: updatedResource };
+      const mobileReviewUrl = mobileReviewToken ? `${getPublicOrigin(ctx.req)}/review?eventId=${encodeURIComponent(eventId)}&token=${encodeURIComponent(mobileReviewToken)}` : undefined;
+      const phoneAlert = shouldNotifyPhoneForOutcome(storedEvent.outcome)
+        ? await publishNtfyDemoAlert({ outcome: storedEvent.outcome, reviewUrl: mobileReviewUrl }).catch(() => ({ delivered: false, status: 0, topic: getNtfyDemoStatus().topic, skipped: false }))
+        : null;
+      return { event: serializeEvent(storedEvent), resource: updatedResource, phoneAlert, mobileReviewUrl, reviewerCode };
     }),
   }),
 });

@@ -129,3 +129,9 @@
 - [ ] Fix the Vercel production authority API route so dashboard queries receive JSON rather than the static client fallback, then verify the live demo end to end.
 - [ ] Connect the Vercel production deployment to the existing Sentra persistent database and verify public authority evidence end to end.
 - [x] Produce a Round 3 direct-submission packet: functional-prototype evidence, technical documentation, product scope, and a final judge-ready presentation.
+- [x] Send one outcome-only ntfy phone alert automatically when the Prompt Injection scenario escalates; do not alert for the other demo scenarios.
+- [x] Diagnose the reported ntfy phone-alert non-delivery and verify the Prompt Injection escalation reaches the subscribed topic.
+- [x] Add an evidence-bound one-time mobile approval or denial flow for the Prompt Injection escalation without granting direct authority through the public ntfy topic.
+- [x] Require a reviewer-held code that is never delivered through ntfy before a mobile escalation can be approved or denied.
+- [x] Add automated coverage for mobile review code rejection, one-time resolution, expiry, and evidence-chain preservation.
+- [x] Update the mobile review instructions to distinguish ntfy delivery from reviewer authority clearly.

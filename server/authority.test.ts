@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { buildCapability, buildEscalationApproval, buildRecordHash, buildScenarioDecision, scenarioLabels, sha256, stableStringify, verifyCapability, verifyEscalationApproval } from "./authority";
+import { buildCapability, buildEscalationApproval, buildRecordHash, buildScenarioDecision, createReviewerCode, hashReviewerCode, scenarioLabels, sha256, stableStringify, verifyCapability, verifyEscalationApproval } from "./authority";
 import { authorizeProtectedVendorApproval, executeProtectedVendorApproval } from "./protectedTool";
 
 describe("Sentra authority engine", () => {
   it("uses a stable canonical representation regardless of input key order", () => {
     expect(stableStringify({ b: 2, a: 1 })).toBe(stableStringify({ a: 1, b: 2 }));
+  });
+
+  it("hashes a reviewer-held code separately from the public phone-review token", () => {
+    const code = createReviewerCode();
+    expect(code).toMatch(/^[A-F0-9]{8}$/);
+    expect(hashReviewerCode(code)).toHaveLength(64);
+    expect(hashReviewerCode(code)).not.toBe(hashReviewerCode("00000000"));
   });
 
   it("changes protected execution state only for the valid action", () => {
@@ -81,8 +88,8 @@ describe("Sentra authority engine", () => {
   it("binds a high-risk escalation request to the original request hash and a limited review window", () => {
     const decision = buildScenarioDecision("Prompt Injection", 72, "human-review");
     const requestHash = sha256(stableStringify(decision.request));
-    const approval = buildEscalationApproval(decision.request, requestHash, new Date("2026-08-13T00:00:00.000Z"));
-    expect(approval).toMatchObject({ state: "PENDING_REVIEW", requiredApproverRole: "procurement-controller", originalRequestHash: requestHash });
+    const approval = buildEscalationApproval(decision.request, requestHash, new Date("2026-08-13T00:00:00.000Z"), "review-demo-token-bound");
+    expect(approval).toMatchObject({ reviewId: "review-demo-token-bound", state: "PENDING_REVIEW", requiredApproverRole: "procurement-controller", originalRequestHash: requestHash });
     expect(verifyEscalationApproval(approval, requestHash, Date.parse("2026-08-13T00:01:00.000Z"))).toEqual({ valid: true, reason: "PENDING_HUMAN_REVIEW" });
     expect(verifyEscalationApproval(approval, sha256(stableStringify({ ...decision.request, action: "export_employee_data" })), Date.parse("2026-08-13T00:01:00.000Z"))).toEqual({ valid: false, reason: "REQUEST_HASH_MISMATCH" });
   });

@@ -50,6 +50,27 @@
       "when": 1786664907485,
       "tag": "0006_lying_marvex",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1786673744178,
+      "tag": "0007_sticky_khan",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1786674157025,
+      "tag": "0008_even_centennial",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1786674198706,
+      "tag": "0009_fixed_blindfold",
+      "breakpoints": true
     }
   ]
 }

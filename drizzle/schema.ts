@@ -44,6 +44,18 @@ export const capabilities = mysqlTable("capabilities", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const escalationReviews = mysqlTable("escalation_reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  reviewId: varchar("reviewId", { length: 96 }).notNull().unique(),
+  eventId: varchar("eventId", { length: 64 }).notNull().unique(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+  reviewerCodeHash: varchar("reviewerCodeHash", { length: 64 }).notNull().default("LEGACY_REVIEW_CODE_UNAVAILABLE"),
+  status: mysqlEnum("status", ["PENDING", "APPROVED", "DENIED"]).notNull().default("PENDING"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const authorityEvents = mysqlTable("authority_events", {
   id: int("id").autoincrement().primaryKey(),
   eventId: varchar("eventId", { length: 64 }).notNull().unique(),
@@ -72,4 +84,5 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type ProtectedResource = typeof protectedResources.$inferSelect;
 export type Capability = typeof capabilities.$inferSelect;
+export type EscalationReview = typeof escalationReviews.$inferSelect;
 export type AuthorityEvent = typeof authorityEvents.$inferSelect;

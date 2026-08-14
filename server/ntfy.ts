@@ -10,6 +10,10 @@ export type NtfyDemoStatus = {
   scope: string;
 };
 
+export function shouldNotifyPhoneForOutcome(outcome: string) {
+  return outcome === "ESCALATE";
+}
+
 export function getNtfyDemoStatus(): NtfyDemoStatus {
   return {
     server: NTFY_SERVER,
@@ -19,17 +23,21 @@ export function getNtfyDemoStatus(): NtfyDemoStatus {
   };
 }
 
-export async function publishNtfyDemoAlert(input: { outcome: string; reasonCode: string | null; eventId: string }): Promise<{ delivered: boolean; status: number; topic: string }> {
+export async function publishNtfyDemoAlert(input: { outcome: string; reviewUrl?: string }): Promise<{ delivered: boolean; status: number; topic: string; skipped: boolean }> {
   const status = getNtfyDemoStatus();
+  if (!shouldNotifyPhoneForOutcome(input.outcome)) {
+    return { delivered: false, status: 0, topic: status.topic, skipped: true };
+  }
   const response = await fetch(`${status.server}/${status.topic}`, {
     method: "POST",
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Title": `Sentra demo · ${input.outcome}`,
-      "Priority": input.outcome === "ALLOW" ? "default" : "high",
-      "Tags": input.outcome === "ALLOW" ? "white_check_mark,shield" : "warning,shield",
+      "Title": "Sentra escalation · human review required",
+      "Priority": "high",
+      "Tags": "warning,shield",
+      ...(input.reviewUrl ? { Click: input.reviewUrl } : {}),
     },
-    body: `Local Sentra authority event ${input.eventId} completed with ${input.outcome}${input.reasonCode ? ` (${input.reasonCode})` : ""}. Open the Sentra demo to inspect the local proof record.`,
+    body: "Sentra escalated an untrusted instruction for human review. Open the Sentra demo to inspect the local proof record.",
   });
-  return { delivered: response.ok, status: response.status, topic: status.topic };
+  return { delivered: response.ok, status: response.status, topic: status.topic, skipped: false };
 }

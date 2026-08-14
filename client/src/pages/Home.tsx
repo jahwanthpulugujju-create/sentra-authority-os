@@ -3,7 +3,7 @@ import { isTransientNetworkError } from "@/lib/apiReliability";
 import { clearDashboardSnapshot, dashboardCacheRetentionToMs, getDashboardCacheRetentionMinutes, isDashboardSnapshotExpired, loadDashboardSnapshot, setDashboardCacheRetentionMinutes, writeDashboardSnapshot, type DashboardSnapshot } from "@/lib/dashboardCache";
 import { formatGuidedDemoDuration, getGuidedDemoProgress, getGuidedReplayContrastState, getUndispatchedGuidedScenario, guidedDemoSteps, type GuidedDemoStatus } from "@/lib/guidedDemo";
 import { buildProofDownloadName, buildProofEmailHref, copyTextToClipboard, serializeProofPackage } from "@/lib/proofDownload";
-import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, BellRing, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Clock3, Copy, Cpu, Database, FileCheck2, Fingerprint, Gauge, KeyRound, ListVideo, LoaderCircle, LockKeyhole, Mail, Pause, Play, RefreshCw, RotateCcw, ScanLine, ShieldCheck, SkipForward, SlidersHorizontal, Sparkles, TimerReset, TriangleAlert, WifiOff, X, Zap } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowRight, BadgeCheck, Braces, Check, ChevronRight, CircleDot, ClipboardCheck, Clock3, Copy, Cpu, Database, FileCheck2, Fingerprint, Gauge, KeyRound, ListVideo, LoaderCircle, LockKeyhole, Mail, Pause, Play, RefreshCw, RotateCcw, ScanLine, ShieldCheck, SkipForward, SlidersHorizontal, Sparkles, TimerReset, TriangleAlert, WifiOff, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
@@ -64,6 +64,7 @@ export default function Home() {
   const [lastLiveRefreshAt, setLastLiveRefreshAt] = useState<number | undefined>(() => offlineSnapshot?.savedAt);
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [lastFailedScenario, setLastFailedScenario] = useState<ScenarioAttempt | null>(null);
+  const [mobileReviewerCode, setMobileReviewerCode] = useState<string | null>(null);
   const [artifactPointer, setArtifactPointer] = useState({ x: 0, y: 0 });
   const [guidedDemoStatus, setGuidedDemoStatus] = useState<GuidedDemoStatus>("idle");
   const [guidedDemoIndex, setGuidedDemoIndex] = useState(0);
@@ -79,16 +80,12 @@ export default function Home() {
     setCacheExpired(false);
   }, [dashboard.data, dashboard.dataUpdatedAt, storage]);
   const resetDemo = trpc.authority.resetDemo.useMutation({
-    onSuccess: () => { setActiveScenario(null); utils.authority.dashboard.invalidate(); },
+    onSuccess: () => { setActiveScenario(null); setMobileReviewerCode(null); utils.authority.dashboard.invalidate(); },
     onError: error => toast.error(isTransientNetworkError(error) ? "Connection interrupted. Reset was not confirmed; wait for Sentra to reconnect." : error.message),
   });
   const runScenario = trpc.authority.runScenario.useMutation({
-    onSuccess: data => { setLastFailedScenario(null); utils.authority.dashboard.invalidate(); setActiveScenario(data.event.scenario); toast.success(`${data.event.outcome}: ${data.event.executionResult}`); },
+    onSuccess: data => { setLastFailedScenario(null); utils.authority.dashboard.invalidate(); setActiveScenario(data.event.scenario); if (data.event.outcome === "ESCALATE") { setMobileReviewerCode(data.reviewerCode || null); toast.warning("ESCALATE: human review required.", { description: data.phoneAlert?.delivered ? "Outcome-only phone alert sent. Enter the dashboard-only reviewer code on the phone to resolve this review." : "The escalation was recorded locally; phone delivery was not confirmed." }); return; } setMobileReviewerCode(null); toast.success(`${data.event.outcome}: ${data.event.executionResult}`); },
     onError: (error, variables) => { setActiveScenario(null); if (isTransientNetworkError(error) && variables.idempotencyKey) { setLastFailedScenario({ scenario: variables.scenario, idempotencyKey: variables.idempotencyKey }); toast.error("Connection interrupted. Retry will reuse the same request key and cannot create a second authority event."); return; } setLastFailedScenario(null); toast.error(error.message); },
-  });
-  const notifyNtfy = trpc.authority.notifyNtfy.useMutation({
-    onSuccess: delivery => toast.success("ntfy demo alert sent.", { description: `Published an outcome-only notification to ${delivery.topic}.` }),
-    onError: error => toast.error(error.message),
   });
 
   const apiUnavailable = !browserOnline || dashboard.isError;
@@ -193,6 +190,7 @@ export default function Home() {
     setGuidedDemoStatus("idle");
     setGuidedDemoIndex(0);
     setGuidedPrompt(DEFAULT_GUIDED_PROMPT);
+    setMobileReviewerCode(null);
     guidedExecutedStepsRef.current.clear();
     setLastFailedScenario(null);
     try {
@@ -201,13 +199,6 @@ export default function Home() {
     } catch {
       // The mutation error toast communicates the failure condition.
     }
-  };
-  const sendNtfyDemoAlert = () => {
-    if (!latest) {
-      toast.error("Run a scenario before sending a demo notification.");
-      return;
-    }
-    notifyNtfy.mutate();
   };
   const updateCacheRetention = (minutes: number) => {
     const next = setDashboardCacheRetentionMinutes(minutes, storage);
@@ -321,6 +312,7 @@ export default function Home() {
         </div></div>
       </section>
 
+      {mobileReviewerCode ? <section className="content-section compact-top"><div className="border border-[#265ec7] bg-[#f3f7fe] p-5 sm:flex sm:items-center sm:justify-between"><div><span className="eyebrow">Phone-review second factor</span><h3 className="mt-2 text-xl font-semibold text-[#112039]">Enter this code on the phone review page.</h3><p className="mt-1 text-sm text-[#5a6678]">It is shown only in this Sentra dashboard and is never included in the ntfy topic, message, or link.</p></div><code className="mt-4 inline-block border border-[#265ec7] bg-white px-4 py-3 font-mono text-2xl font-bold tracking-[0.18em] text-[#112039] sm:mt-0">{mobileReviewerCode}</code></div></section> : null}
       <section className="record-section"><div className="content-section compact-top"><SectionHeading eyebrow="Decision records" title="See exactly what was decided." description="Each authority event carries the stored request, policy outcome, capability material, gateway result, and protected execution result." />
         <div className="records-grid"><div className="decision-panel"><PanelBar icon={Activity} title="Live decision feed" end={`${events.length} records`} /><div className="decision-list">{events.length ? events.slice(0, 6).map(event => <DecisionRow key={event.eventId} event={event} reasonDescription={reasonCodeDescriptions[event.reasonCode]} />) : <Blank text="Run any scenario to create the first persistent decision." />}</div></div>
           <div className="request-panel"><span className="eyebrow">Canonical request</span><h3>Exact scope. Exact hashes.</h3>{latest ? <><div className="request-source"><span>Local persistent record</span><b>{latest.policyVersion || latest.canonicalRequest.policyVersion || activePolicyVersion}</b><span>{formatTime(latest.createdAt)}</span></div><div className="request-code"><pre>{JSON.stringify(latest.canonicalRequest, null, 2)}</pre></div><div className="hash-grid"><HashCard label="Request hash" value={latest.requestHash} /><HashCard label="Capability hash" value={latest.capabilityHash} /></div><div className="request-foot"><Braces className="h-4 w-4" />The stored request is the input Sentra actually evaluated.</div></> : <Blank text="A request inspector will appear after the first authority decision." />}</div>
@@ -331,7 +323,7 @@ export default function Home() {
         <KeyLifecyclePanel keys={keyHistory} verificationModel={keyVerificationModel} />
       </section>
 
-      <section id="proof" className="content-section proof-section"><div className="proof-head"><SectionHeading eyebrow="Replayable proof" title="A decision that can be inspected after it happens." description="Each record commits the request, policy result, capability status, gateway verdict, execution result, and preceding proof hash." /><div className="proof-statement"><span>Sentra invariant</span><b>No valid decision.<br /><em>No valid capability.</em><br />No execution.</b><div className={`proof-integrity ${data?.proofIntegrity?.valid ? "integrity-valid" : "integrity-pending"}`}><ShieldCheck className="h-3.5 w-3.5" />{data?.proofIntegrity?.valid ? `Proof chain verified · ${data.proofIntegrity.checkedEvents} records` : "Proof chain awaiting verification"}</div><div className="proof-actions"><button type="button" className={`proof-copy ${proofExport.isFetching ? "control-loading" : ""}`} disabled={proofExport.isFetching || apiUnavailable} onClick={() => void copyProofRecord()} aria-busy={proofExport.isFetching}>{proofExport.isFetching ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <Copy className="h-3.5 w-3.5" />}{proofExport.isFetching ? "Preparing proof…" : "Copy proof JSON"}</button><button type="button" className={`proof-email ${proofExport.isFetching ? "control-loading" : ""}`} disabled={proofExport.isFetching || apiUnavailable} onClick={() => void shareProofViaEmail()} aria-busy={proofExport.isFetching}>{proofExport.isFetching ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <Mail className="h-3.5 w-3.5" />}{proofExport.isFetching ? "Preparing proof…" : "Share via email"}</button><button type="button" className={`proof-export ${proofExport.isFetching ? "control-loading" : ""}`} disabled={proofExport.isFetching || apiUnavailable} onClick={() => void downloadProofRecord()} aria-busy={proofExport.isFetching}>{proofExport.isFetching ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <FileCheck2 className="h-3.5 w-3.5" />}{proofExport.isFetching ? "Preparing proof…" : "Download proof record"}</button><button type="button" className={`proof-reset ${resetDemo.isPending ? "control-loading" : ""}`} disabled={resetDemo.isPending || runScenario.isPending || !apiReady} onClick={() => void resetProofWorkspace()} aria-busy={resetDemo.isPending}>{resetDemo.isPending ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <RotateCcw className="h-3.5 w-3.5" />}{resetDemo.isPending ? "Resetting…" : "Reset proof & inputs"}</button><button type="button" className={`proof-ntfy ${notifyNtfy.isPending ? "control-loading" : ""}`} disabled={notifyNtfy.isPending || apiUnavailable || !latest} onClick={sendNtfyDemoAlert} aria-busy={notifyNtfy.isPending}>{notifyNtfy.isPending ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <BellRing className="h-3.5 w-3.5" />}{notifyNtfy.isPending ? "Sending alert…" : "Send ntfy demo alert"}</button><p className="ntfy-scope">{ntfyStatus.data ? `ntfy demo topic: ${ntfyStatus.data.topic} · outcome only` : "Preparing isolated ntfy demo channel…"}</p></div></div></div>
+      <section id="proof" className="content-section proof-section"><div className="proof-head"><SectionHeading eyebrow="Replayable proof" title="A decision that can be inspected after it happens." description="Each record commits the request, policy result, capability status, gateway verdict, execution result, and preceding proof hash." /><div className="proof-statement"><span>Sentra invariant</span><b>No valid decision.<br /><em>No valid capability.</em><br />No execution.</b><div className={`proof-integrity ${data?.proofIntegrity?.valid ? "integrity-valid" : "integrity-pending"}`}><ShieldCheck className="h-3.5 w-3.5" />{data?.proofIntegrity?.valid ? `Proof chain verified · ${data.proofIntegrity.checkedEvents} records` : "Proof chain awaiting verification"}</div><div className="proof-actions"><button type="button" className={`proof-copy ${proofExport.isFetching ? "control-loading" : ""}`} disabled={proofExport.isFetching || apiUnavailable} onClick={() => void copyProofRecord()} aria-busy={proofExport.isFetching}>{proofExport.isFetching ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <Copy className="h-3.5 w-3.5" />}{proofExport.isFetching ? "Preparing proof…" : "Copy proof JSON"}</button><button type="button" className={`proof-email ${proofExport.isFetching ? "control-loading" : ""}`} disabled={proofExport.isFetching || apiUnavailable} onClick={() => void shareProofViaEmail()} aria-busy={proofExport.isFetching}>{proofExport.isFetching ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <Mail className="h-3.5 w-3.5" />}{proofExport.isFetching ? "Preparing proof…" : "Share via email"}</button><button type="button" className={`proof-export ${proofExport.isFetching ? "control-loading" : ""}`} disabled={proofExport.isFetching || apiUnavailable} onClick={() => void downloadProofRecord()} aria-busy={proofExport.isFetching}>{proofExport.isFetching ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <FileCheck2 className="h-3.5 w-3.5" />}{proofExport.isFetching ? "Preparing proof…" : "Download proof record"}</button><button type="button" className={`proof-reset ${resetDemo.isPending ? "control-loading" : ""}`} disabled={resetDemo.isPending || runScenario.isPending || !apiReady} onClick={() => void resetProofWorkspace()} aria-busy={resetDemo.isPending}>{resetDemo.isPending ? <LoaderCircle className="h-3.5 w-3.5 spin-icon" /> : <RotateCcw className="h-3.5 w-3.5" />}{resetDemo.isPending ? "Resetting…" : "Reset proof & inputs"}</button><p className="ntfy-scope">{ntfyStatus.data ? `Phone escalation armed: Prompt Injection only → ${ntfyStatus.data.topic} · outcome only` : "Preparing isolated phone escalation channel…"}</p></div></div></div>
         <div className="proof-layout"><div className="proof-stages">{[["01","Canonicalize","Build the stable request representation."],["02","Decide","Apply deterministic policy."],["03","Verify","Bind and verify capability."],["04","Prove","Chain the result to evidence."]].map(([n,t,c]) => <div className="proof-stage" key={n}><span>{n}</span><div><b>{t}</b><p>{c}</p></div></div>)}</div><div className="timeline-panel"><PanelBar icon={Fingerprint} title="Persistent audit timeline" end="genesis → now" /><div className="timeline-list">{events.length ? events.map((event, i) => <ProofRow key={event.eventId} event={event} latest={i === 0} />) : <Blank text="The first test will establish the visible proof chain." />}</div></div></div>
       </section>
 
