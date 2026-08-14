@@ -126,3 +126,6 @@
 - [x] Create a detailed, simple, storytelling final-round pitch script with exact website actions, timing, judge explanations, and rehearsal guidance.
 - [x] Commit and push the remaining verified Sentra changes under Jahwanth’s GitHub identity.
 - [x] Prepare a Vercel-compatible deployment handoff with an Express serverless adapter, build configuration, documented managed environment variables, and user-owned publication steps.
+- [ ] Fix the Vercel production authority API route so dashboard queries receive JSON rather than the static client fallback, then verify the live demo end to end.
+- [ ] Connect the Vercel production deployment to the existing Sentra persistent database and verify public authority evidence end to end.
+- [x] Produce a Round 3 direct-submission packet: functional-prototype evidence, technical documentation, product scope, and a final judge-ready presentation.
