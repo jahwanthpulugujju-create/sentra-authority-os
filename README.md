@@ -89,7 +89,7 @@ With the local application running, run the complete real API verification pass:
 
 The script resets the demo baseline, executes all six scenarios through the server, verifies one allowed state change and five refused paths, then confirms a valid six-record proof chain. This is a reproducible demo check, not an external security certification.
 
-## Deliverables
+## Round 2 deliverables
 
 | Deliverable | Evidence in this repository |
 |---|---|
@@ -108,6 +108,7 @@ The script resets the demo baseline, executes all six scenarios through the serv
 | Judge-machine release runbook | [`SENTRA_RELEASE_RUNBOOK.md`](./SENTRA_RELEASE_RUNBOOK.md) |
 | Human-owned validation gates | [`SENTRA_HUMAN_VALIDATION_GATES.md`](./SENTRA_HUMAN_VALIDATION_GATES.md) |
 | Final roadmap completion report | [`SENTRA_46_PLUS_COMPLETION_REPORT.md`](./SENTRA_46_PLUS_COMPLETION_REPORT.md) |
+| Vercel deployment handoff | [`VERCEL_DEPLOYMENT_HANDOFF.md`](./VERCEL_DEPLOYMENT_HANDOFF.md) |
 
 ## Scope and limitations
 
