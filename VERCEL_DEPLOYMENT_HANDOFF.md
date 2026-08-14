@@ -17,6 +17,14 @@ Vercel supports default-exported Express applications and requires static assets
 | 5 | **Environment Variables** | Add the required values below separately for Production and Preview as appropriate. Never commit them. |
 | 6 | **Deploy** | Use the Vercel dashboard to create the deployment, then run the smoke test below. |
 
+## Observed import status
+
+The Vercel account is authenticated, but the direct import URL returned a Vercel **404** for this private GitHub repository. This indicates that the Vercel Git integration has not yet been granted access to `jahwanthpulugujju-create/sentra-authority-os`, or that the repository needs to be selected from Vercel’s Git import chooser after access is granted. In Vercel, open **Add New → Project**, select **Continue with GitHub** or **Adjust GitHub App Permissions**, grant the Vercel GitHub App access to this repository, then return to the project importer. Do not change the repository visibility merely to work around the issue.
+
+After the repository was connected, the first Vercel production deployment still referenced commit `ed2fadb`, which predates the Vercel API adapter. The production site therefore served the static client but returned Vercel `NOT_FOUND` for `/api/trpc/*`. The deployment must be refreshed from a commit at or after `3cfb7c0`, which contains `api/[...path].ts`, `vercel.json`, and the shared Express application factory. Verify the deployed commit and the authority API response before calling the Vercel demo ready.
+
+A subsequent user-attributed trigger commit, `150c288`, started a new Vercel production build after the Git connection was active. Vercel reported the build **Ready** and assigned the deployment URL `https://sentra-authority-ejmbtcryy-jahwanthpulugujju-creates-projects.vercel.app`. The next required validation is an `/api/trpc/dashboard` JSON response from this deployment and the canonical production domain.
+
 ## Required environment configuration
 
 | Variable | Requirement | Reason |
