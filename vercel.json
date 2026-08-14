@@ -5,9 +5,14 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist/public",
   "functions": {
-    "api/[...path].ts": {
-      "maxDuration": 30,
-      "includeFiles": "dist/public/**"
+    "api/*.ts": {
+      "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    }
+  ]
 }
