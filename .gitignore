@@ -6,6 +6,7 @@
 dist/
 build/
 *.dist
+api/sentra-app.js
 
 # Environment variables
 .env

@@ -5,7 +5,7 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist/public",
   "functions": {
-    "api/*.ts": {
+    "api/index.js": {
       "maxDuration": 30
     }
   },
