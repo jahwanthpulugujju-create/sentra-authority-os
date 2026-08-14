@@ -89,7 +89,7 @@ With the local application running, run the complete real API verification pass:
 
 The script resets the demo baseline, executes all six scenarios through the server, verifies one allowed state change and five refused paths, then confirms a valid six-record proof chain. This is a reproducible demo check, not an external security certification.
 
-## Round 2 deliverables
+## Deliverables
 
 | Deliverable | Evidence in this repository |
 |---|---|
