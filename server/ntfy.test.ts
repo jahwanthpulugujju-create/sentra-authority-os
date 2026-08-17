@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { getNtfyDemoStatus, publishNtfyDemoAlert, shouldNotifyPhoneForOutcome } from "./ntfy";
 
 describe("ntfy controlled demo channel", () => {
-  it("creates an ephemeral randomized topic and documents that proof payloads remain local", () => {
+  it("uses a stable high-entropy delivery topic and documents that proof payloads remain local", () => {
     const status = getNtfyDemoStatus();
     expect(status.server).toBe("https://ntfy.sh");
-    expect(status.topic).toMatch(/^sentra-demo-[a-f0-9]{20}$/);
+    expect(status.topic).toBe("sentra-demo-b3457500d095decaf168");
     expect(status.scope).toContain("canonical requests");
+    expect(status.scope).toContain("dashboard-held reviewer code");
     expect(status.subscribeUrl).toBe(`https://ntfy.sh/${status.topic}`);
   });
 

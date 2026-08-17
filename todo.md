@@ -136,3 +136,9 @@
 - [x] Add automated coverage for mobile review code rejection, one-time resolution, expiry, and evidence-chain preservation.
 - [x] Update the mobile review instructions to distinguish ntfy delivery from reviewer authority clearly.
 - [x] Fix the DecisionRow renderer so mobile-review evidence events with no capability render safely in the live dashboard.
+- [x] Preserve one configured controlled-demo ntfy topic across normal Sentra server restarts so a subscribed phone continues to receive escalation alerts.
+- [x] Trigger and verify one user-authorized simulated Prompt Injection escalation through the stable phone-review path.
+- [x] Test the user-authorized mobile approval outcome for the pending Prompt Injection review and verify it remains bounded to review closure.
+- [x] Restore the temporary Sentra preview and verify that a current mobile review link is reachable from the user’s phone.
+- [x] Produce a credible startup positioning playbook for Sentra, including buyer, beachhead, differentiation, validation milestones, and claim boundaries.
+- [x] Produce a technical architecture and API-schema reference for Sentra’s runtime authority layer.

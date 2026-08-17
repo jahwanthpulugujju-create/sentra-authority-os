@@ -1,7 +1,7 @@
-import { randomBytes } from "node:crypto";
-
 const NTFY_SERVER = "https://ntfy.sh";
-const DEMO_TOPIC = `sentra-demo-${randomBytes(10).toString("hex")}`;
+// This high-entropy topic is delivery-only: it carries no proof payload and cannot authorize a review.
+// Keeping it stable lets the designated phone stay subscribed through normal dev-server restarts.
+const DEMO_TOPIC = process.env.SENTRA_NTFY_TOPIC?.trim() || "sentra-demo-b3457500d095decaf168";
 
 export type NtfyDemoStatus = {
   server: string;
@@ -19,7 +19,7 @@ export function getNtfyDemoStatus(): NtfyDemoStatus {
     server: NTFY_SERVER,
     topic: DEMO_TOPIC,
     subscribeUrl: `${NTFY_SERVER}/${DEMO_TOPIC}`,
-    scope: "Ephemeral public demo channel. It receives only a high-level authority outcome; canonical requests, proof JSON, hashes, identities, and limits remain in Sentra.",
+    scope: "Stable public controlled-demo delivery channel. It receives only a high-level authority outcome; canonical requests, proof JSON, hashes, identities, and limits remain in Sentra. The separate dashboard-held reviewer code is required for any phone resolution.",
   };
 }
 
