@@ -71,6 +71,13 @@
       "when": 1786674198706,
       "tag": "0009_fixed_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787076081739,
+      "tag": "0010_acoustic_switch",
+      "breakpoints": true
     }
   ]
 }

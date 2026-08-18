@@ -1,0 +1,27 @@
+flowchart TD
+    A[Agent proposes an action] --> B[Canonical request
+identity • tool • resource • purpose • limit • workflow]
+    B --> C[Trusted context
+resource state • policy version • approved risk source]
+    C --> D[Deterministic policy kernel]
+    D -->|ALLOW| E[Scoped capability
+request hash • nonce • expiry • one use]
+    D -->|ESCALATE| F[Human review queue]
+    D -->|DENY / FREEZE| G[Refusal evidence]
+    E --> H[Independent gateway]
+    H --> I[Protected-tool adapter]
+    I --> J[Execution receipt]
+    F --> K[Bounded review decision]
+    K --> L[Fresh request required]
+    H --> M[Authority evidence ledger]
+    J --> M
+    G --> M
+    K --> M
+    M --> N[Transactional outbox]
+    N --> O[Event stream]
+    O --> P[Analytics and advisory intelligence]
+    P --> Q[Policy-quality recommendation]
+    Q -. policy author approval required .-> D
+    R[Operational signals
+replay • burst • adapter error] --> S[Increase friction only]
+    S --> D

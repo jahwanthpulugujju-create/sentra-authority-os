@@ -80,9 +80,27 @@ export const authorityEvents = mysqlTable("authority_events", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const authorityOutbox = mysqlTable("authority_outbox", {
+  id: int("id").autoincrement().primaryKey(),
+  outboxId: varchar("outboxId", { length: 64 }).notNull().unique(),
+  sourceEventId: varchar("sourceEventId", { length: 64 }).notNull().unique(),
+  eventType: varchar("eventType", { length: 80 }).notNull(),
+  schemaVersion: varchar("schemaVersion", { length: 16 }).notNull().default("1.0"),
+  tenantId: varchar("tenantId", { length: 96 }).notNull(),
+  correlationId: varchar("correlationId", { length: 96 }).notNull(),
+  causationId: varchar("causationId", { length: 96 }),
+  payload: text("payload").notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["PENDING", "PUBLISHED", "FAILED"]).notNull().default("PENDING"),
+  attempts: int("attempts").notNull().default(0),
+  publishedAt: timestamp("publishedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type ProtectedResource = typeof protectedResources.$inferSelect;
 export type Capability = typeof capabilities.$inferSelect;
 export type EscalationReview = typeof escalationReviews.$inferSelect;
 export type AuthorityEvent = typeof authorityEvents.$inferSelect;
+export type AuthorityOutbox = typeof authorityOutbox.$inferSelect;

@@ -1,13 +1,14 @@
 import { desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { authorityEvents, capabilities, escalationReviews, protectedResources } from "../drizzle/schema";
+import { authorityEvents, authorityOutbox, capabilities, escalationReviews, protectedResources } from "../drizzle/schema";
 import { buildCapability, buildEscalationApproval, buildRecordHash, buildScenarioDecision, createReviewerCode, hashReviewerCode, scenarioLabels, sha256, stableStringify, verifyCapability, type EscalationApproval, type SignedCapability } from "./authority";
 import { listKeyHistory } from "./keys";
 import { ACTIVE_POLICY_VERSION, listPolicyHistory, reasonCodeDescriptions } from "./policy";
 import { buildProofExportPackage } from "./proofExport";
 import { getNtfyDemoStatus, publishNtfyDemoAlert, shouldNotifyPhoneForOutcome } from "./ntfy";
 import { validateMobileReviewResolution } from "./mobileReview";
+import { buildAuthorityOutboxEvent } from "./eventContract";
 import { authorizeProtectedVendorApproval, executeProtectedVendorApproval } from "./protectedTool";
 import { ensureProtectedResource, expireStaleCapabilities, getDemoMetrics, getRequiredDb, listAuthorityEvents, refreshResourceContext, verifyProofChain } from "./sentraDb";
 import { COOKIE_NAME } from "../shared/const";
@@ -95,6 +96,8 @@ export const appRouter = router({
         const recordHash = buildRecordHash({ previousHash: latestRecord?.recordHash || "GENESIS", eventId: reviewEventId, scenario: "Mobile Review", outcome: "ESCALATE", requestHash: sha256(resolutionRequest), capabilityHash: null, approvalHash, gatewayResult, executionResult, reasonCode });
         await tx.update(escalationReviews).set({ status: input.decision, resolvedAt: now }).where(eq(escalationReviews.id, review.id));
         await tx.insert(authorityEvents).values({ eventId: reviewEventId, scenario: "Mobile Review", outcome: "ESCALATE", requestId: `review-${review.reviewId}`, resourceId: event.resourceId, canonicalRequest: resolutionRequest, requestHash: sha256(resolutionRequest), policyVersion: event.policyVersion, reasonCode, capability: null, capabilityHash: null, approval: event.approval, approvalHash, gatewayResult, executionResult, executionChanged: 0, decisionLatencyMs: 0, previousHash: latestRecord?.recordHash || "GENESIS", recordHash });
+        const outboxEvent = buildAuthorityOutboxEvent({ eventType: "review.lifecycle.resolved", tenantId: "demo-procurement-tenant", correlationId: event.requestId, causationId: event.eventId, sourceEventId: reviewEventId, outcome: "ESCALATE", reasonCode, requestHash: sha256(resolutionRequest), approvalHash, now });
+        await tx.insert(authorityOutbox).values({ outboxId: outboxEvent.outboxId, sourceEventId: reviewEventId, eventType: outboxEvent.eventType, schemaVersion: outboxEvent.schemaVersion, tenantId: outboxEvent.tenantId, correlationId: outboxEvent.correlationId, causationId: outboxEvent.causationId, payload: stableStringify(outboxEvent.payload), payloadHash: outboxEvent.payloadHash, status: "PENDING" });
         return { reviewId: review.reviewId, status: input.decision, message: input.decision === "APPROVED" ? "Review approved. The original untrusted action remains blocked and must be resubmitted as a new trusted request." : "Review denied. The original untrusted action remains blocked." };
       });
     }),
@@ -105,6 +108,7 @@ export const appRouter = router({
       await db.transaction(async tx => {
         await tx.delete(escalationReviews);
         await tx.delete(capabilities);
+        await tx.delete(authorityOutbox);
         await tx.delete(authorityEvents);
         await tx.update(protectedResources).set({ executionState: 0, contextScore: 72, lastCheckedAt: new Date() }).where(eq(protectedResources.id, resource.id));
       });
@@ -177,6 +181,8 @@ export const appRouter = router({
         const decisionLatencyMs = Math.max(0, Date.now() - startedAt);
         const recordHash = buildRecordHash({ previousHash, eventId, scenario: input.scenario, outcome: decision.outcome, requestHash, capabilityHash, approvalHash, gatewayResult, executionResult, reasonCode: decision.reasonCode });
         await tx.insert(authorityEvents).values({ eventId, scenario: input.scenario, outcome: decision.outcome, requestId, resourceId: resource.id, canonicalRequest, requestHash, policyVersion: decision.request.policyVersion, reasonCode: decision.reasonCode, capability: capabilityJson, capabilityHash, approval: approvalJson, approvalHash, gatewayResult, executionResult, executionChanged, decisionLatencyMs, previousHash, recordHash });
+        const outboxEvent = buildAuthorityOutboxEvent({ eventType: "authority.decision.created", tenantId: decision.request.tenantId, correlationId: requestId, sourceEventId: eventId, outcome: decision.outcome, reasonCode: decision.reasonCode, requestHash, capabilityHash, approvalHash, executionChanged: Boolean(executionChanged), now });
+        await tx.insert(authorityOutbox).values({ outboxId: outboxEvent.outboxId, sourceEventId: eventId, eventType: outboxEvent.eventType, schemaVersion: outboxEvent.schemaVersion, tenantId: outboxEvent.tenantId, correlationId: outboxEvent.correlationId, causationId: outboxEvent.causationId, payload: stableStringify(outboxEvent.payload), payloadHash: outboxEvent.payloadHash, status: "PENDING" });
         return { eventId };
       });
 

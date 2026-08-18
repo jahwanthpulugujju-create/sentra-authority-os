@@ -126,7 +126,7 @@
 - [x] Create a detailed, simple, storytelling final-round pitch script with exact website actions, timing, judge explanations, and rehearsal guidance.
 - [x] Commit and push the remaining verified Sentra changes under Jahwanth’s GitHub identity.
 - [x] Prepare a Vercel-compatible deployment handoff with an Express serverless adapter, build configuration, documented managed environment variables, and user-owned publication steps.
-- [ ] Fix the Vercel production authority API route so dashboard queries receive JSON rather than the static client fallback, then verify the live demo end to end.
+- [x] Fix the Vercel production authority API route so dashboard queries reach the Express API rather than the static client fallback; end-to-end production verification remains blocked only by missing production database environment variables.
 - [ ] Connect the Vercel production deployment to the existing Sentra persistent database and verify public authority evidence end to end.
 - [x] Produce a Round 3 direct-submission packet: functional-prototype evidence, technical documentation, product scope, and a final judge-ready presentation.
 - [x] Send one outcome-only ntfy phone alert automatically when the Prompt Injection scenario escalates; do not alert for the other demo scenarios.
@@ -142,3 +142,9 @@
 - [x] Restore the temporary Sentra preview and verify that a current mobile review link is reachable from the user’s phone.
 - [x] Produce a credible startup positioning playbook for Sentra, including buyer, beachhead, differentiation, validation milestones, and claim boundaries.
 - [x] Produce a technical architecture and API-schema reference for Sentra’s runtime authority layer.
+- [x] Analyze Project_V.pdf as the primary source, review the Day-1, Day-2, and Introduction PDFs, and map their requirements to Sentra.
+- [x] Baseline the current Sentra implementation against the approved platform-evolution plan and document the first protected workflow assumptions.
+- [x] Produce the core architecture, policy lifecycle, data governance, event taxonomy, gateway guide, human-review governance, threat model, and reliability documentation package.
+- [x] Implement feasible authority-foundation hardening improvements with regression coverage, preserving deterministic final authorization.
+- [x] Define the high-scale infrastructure migration, benchmark gates, design-partner motion, and responsible optimization controls.
+- [x] Validate and deliver the completed Sentra platform-evolution package with explicit production infrastructure dependencies.
