@@ -126,8 +126,8 @@
 - [x] Create a detailed, simple, storytelling final-round pitch script with exact website actions, timing, judge explanations, and rehearsal guidance.
 - [x] Commit and push the remaining verified Sentra changes under Jahwanth’s GitHub identity.
 - [x] Prepare a Vercel-compatible deployment handoff with an Express serverless adapter, build configuration, documented managed environment variables, and user-owned publication steps.
-- [x] Fix the Vercel production authority API route so dashboard queries reach the Express API rather than the static client fallback; end-to-end production verification remains blocked only by missing production database environment variables.
-- [ ] Connect the Vercel production deployment to the existing Sentra persistent database and verify public authority evidence end to end.
+- [x] Fix the Vercel production authority API route so dashboard queries reach the Express API rather than the static client fallback; public verification now returns TiDB-backed authority JSON.
+- [x] Connect the Vercel production deployment to a persistent TiDB Cloud database and verify public authority evidence end to end.
 - [x] Produce a Round 3 direct-submission packet: functional-prototype evidence, technical documentation, product scope, and a final judge-ready presentation.
 - [x] Send one outcome-only ntfy phone alert automatically when the Prompt Injection scenario escalates; do not alert for the other demo scenarios.
 - [x] Diagnose the reported ntfy phone-alert non-delivery and verify the Prompt Injection escalation reaches the subscribed topic.
@@ -148,5 +148,5 @@
 - [x] Implement feasible authority-foundation hardening improvements with regression coverage, preserving deterministic final authorization.
 - [x] Define the high-scale infrastructure migration, benchmark gates, design-partner motion, and responsible optimization controls.
 - [x] Validate and deliver the completed Sentra platform-evolution package with explicit production infrastructure dependencies.
-- [ ] Provision a user-owned, free MySQL-compatible production database for Sentra and apply the tracked schema migrations.
-- [ ] Store the production database connection as a sensitive, Production-only Vercel `DATABASE_URL`, redeploy, and verify public authority evidence end to end.
+- [x] Provision a user-owned, free MySQL-compatible production database for Sentra and apply the tracked schema migrations.
+- [x] Store the production database connection as a sensitive, Production-only Vercel `DATABASE_URL`, redeploy, and verify public authority evidence end to end.
