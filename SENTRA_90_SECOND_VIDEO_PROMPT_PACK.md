@@ -1,5 +1,7 @@
 # Sentra 90-Second Video Prompt Pack
 
+> **Render status — August 20, 2026:** The first 10-second render was attempted with the prepared 16:9 Sentra reference frame, but the free-plan daily video quota was already exhausted (`1/1`). No video has been fabricated or substituted. Resume with Clip 01 when generation capacity resets or an upgraded quota is available, then continue through Clips 02–09 in the stated order.
+
 ## Use these settings for every clip
 
 Generate **nine separate 10-second clips** in **16:9 landscape**, preferably at **1080p** and at the same frame rate. Use the same reference image for all nine clips if your generator supports image-to-video. Use **no voiceover**, **no visible logos**, **no people**, **no physical hardware**, **no dark background**, **no generic hacker visuals**, **no rapidly flickering effects**, and **no readable text inside the generated clip**. Add the listed one-line overlays later in an editor so the typography remains exact.
