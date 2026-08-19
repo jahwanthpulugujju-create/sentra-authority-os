@@ -1,15 +1,32 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql, { type PoolOptions } from "mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+export function getDatabasePoolOptions(connectionString: string): PoolOptions {
+  const url = new URL(connectionString);
+  const isTiDbCloud = url.hostname.endsWith(".tidbcloud.com");
+
+  return {
+    host: url.hostname,
+    port: Number(url.port || 3306),
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: url.pathname.slice(1),
+    ...(isTiDbCloud ? { ssl: { rejectUnauthorized: true } } : {}),
+  };
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle({
+        client: mysql.createPool(getDatabasePoolOptions(process.env.DATABASE_URL)),
+      });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

@@ -148,3 +148,5 @@
 - [x] Implement feasible authority-foundation hardening improvements with regression coverage, preserving deterministic final authorization.
 - [x] Define the high-scale infrastructure migration, benchmark gates, design-partner motion, and responsible optimization controls.
 - [x] Validate and deliver the completed Sentra platform-evolution package with explicit production infrastructure dependencies.
+- [ ] Provision a user-owned, free MySQL-compatible production database for Sentra and apply the tracked schema migrations.
+- [ ] Store the production database connection as a sensitive, Production-only Vercel `DATABASE_URL`, redeploy, and verify public authority evidence end to end.
