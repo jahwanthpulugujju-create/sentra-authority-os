@@ -14,7 +14,8 @@ Provide values through your shell or deployment secret manager. Local environmen
 - `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL` — required when using the existing managed OAuth integration.
 - `OWNER_OPEN_ID` — optional owner-specific administration identity.
 - `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY` — managed service configuration for dependent storage and service integrations.
-- `SENTRA_NTFY_TOPIC` — optional notification topic. Use a private deployment-specific topic when enabling notifications.
+- `SENTRA_NOTIFICATIONS_ENABLED` — set to `true` only to opt in to external notification delivery. Defaults to disabled.
+- `SENTRA_NTFY_TOPIC` — explicit deployment-specific topic, required along with the opt-in flag to send notifications. ntfy topics are delivery channels, not authorization credentials; use an access-controlled service for private notifications.
 
 Only public configuration belongs in variables prefixed with `VITE_`; Vite embeds them in client assets.
 

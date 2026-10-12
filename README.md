@@ -75,6 +75,8 @@ pnpm dev
 
 Open the URL printed by the server, normally **http://localhost:3000**. The Compose credentials are local demonstration values and the database port binds to loopback. Optional OAuth and managed-service integrations need separate configuration; see [Development](docs/development.md).
 
+External notifications are disabled by default. To enable them, configure both `SENTRA_NOTIFICATIONS_ENABLED=true` and your own `SENTRA_NTFY_TOPIC`. A fresh fork and CI do not send phone notifications.
+
 With the isolated application running, `./verify-demo.sh` checks API scenarios, idempotency, and proof export. This Bash script resets demonstration state. Never point it at live operational records.
 
 ## Repository map

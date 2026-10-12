@@ -21,6 +21,7 @@ jobs:
     env:
       DATABASE_URL: mysql://sentra:sentra_local_only@127.0.0.1:3306/sentra
       JWT_SECRET: sentra-ci-only-secret
+      SENTRA_NOTIFICATIONS_ENABLED: 'false'
     services:
       database:
         image: mysql:8.4

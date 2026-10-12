@@ -4,6 +4,7 @@ const NTFY_SERVER = "https://ntfy.sh";
 const DEMO_TOPIC = process.env.SENTRA_NTFY_TOPIC?.trim() || "sentra-demo-b3457500d095decaf168";
 
 export type NtfyDemoStatus = {
+  enabled: boolean;
   server: string;
   topic: string;
   subscribeUrl: string;
@@ -15,17 +16,19 @@ export function shouldNotifyPhoneForOutcome(outcome: string) {
 }
 
 export function getNtfyDemoStatus(): NtfyDemoStatus {
+  const enabled = process.env.SENTRA_NOTIFICATIONS_ENABLED === "true" && Boolean(process.env.SENTRA_NTFY_TOPIC?.trim());
   return {
+    enabled,
     server: NTFY_SERVER,
     topic: DEMO_TOPIC,
     subscribeUrl: `${NTFY_SERVER}/${DEMO_TOPIC}`,
-    scope: "Stable public controlled-demo delivery channel. It receives only a high-level authority outcome; canonical requests, proof JSON, hashes, identities, and limits remain in Sentra. The separate dashboard-held reviewer code is required for any phone resolution.",
+    scope: `${enabled ? "Notification delivery enabled." : "Notification delivery disabled; configure an explicit topic and opt in to enable it."} This controlled-demo channel receives only a high-level authority outcome; canonical requests, proof JSON, hashes, identities, and limits remain in Sentra. The separate dashboard-held reviewer code is required for any phone resolution.`,
   };
 }
 
 export async function publishNtfyDemoAlert(input: { outcome: string; reviewUrl?: string }): Promise<{ delivered: boolean; status: number; topic: string; skipped: boolean }> {
   const status = getNtfyDemoStatus();
-  if (!shouldNotifyPhoneForOutcome(input.outcome)) {
+  if (!status.enabled || !shouldNotifyPhoneForOutcome(input.outcome)) {
     return { delivered: false, status: 0, topic: status.topic, skipped: true };
   }
   const response = await fetch(`${status.server}/${status.topic}`, {
