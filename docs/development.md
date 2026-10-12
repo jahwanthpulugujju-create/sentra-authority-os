@@ -2,7 +2,7 @@
 
 ## Runtime and dependencies
 
-Use Node.js 22 or later and the pnpm version declared in `package.json`. Install with `pnpm install --frozen-lockfile`. Keep `pnpm-lock.yaml` and dependency patches under version control.
+Use Node.js 22.13 or later and the pnpm version declared in `package.json`. Install with `pnpm install --frozen-lockfile`. Keep `pnpm-lock.yaml` and dependency patches under version control.
 
 ## Configuration
 
@@ -18,6 +18,8 @@ Provide values through your shell or deployment secret manager. Local environmen
 
 Only public configuration belongs in variables prefixed with `VITE_`; Vite embeds them in client assets.
 
+For a local database, `docker compose up -d --wait database` starts a loopback-bound MySQL service. Set the `DATABASE_URL` shown in the README and run `pnpm db:migrate` to apply committed migrations. Use `docker compose stop` to stop the service while retaining its data.
+
 Review `drizzle/schema.ts` and the committed migrations before applying schema changes. The existing `pnpm db:push` script generates and then applies migrations; inspect the generated changes before using it against a shared database. The API's persisted workflows require a configured database; unit tests can run without a live database.
 
 ## Validation
@@ -32,4 +34,4 @@ Tests exercise policy decisions, request binding, capability lifecycle, gateway 
 
 With the configured application running, use Bash to run `./verify-demo.sh`. This performs a real API check of the six scenarios and proof chain. It resets the demo baseline and changes demonstration state; use an isolated verification database.
 
-The development and start scripts use POSIX environment assignment. On Windows, run those scripts from Git Bash or WSL, or set `NODE_ENV` in PowerShell and invoke `pnpm exec tsx watch server/_core/index.ts` for development.
+The development and production scripts set `NODE_ENV` through a portable Node.js entry point and work in PowerShell or Bash. `pnpm dev` uses Node watch mode and the tsx loader. The API verification script still requires Bash and curl.

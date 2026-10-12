@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: mysql://sentra:sentra_local_only@127.0.0.1:3306/sentra
+      JWT_SECRET: sentra-ci-only-secret
+    services:
+      database:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: sentra
+          MYSQL_USER: sentra
+          MYSQL_PASSWORD: sentra_local_only
+          MYSQL_ROOT_PASSWORD: root_local_only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm check
+      - name: Run unit tests
+        run: pnpm test
+      - name: Build production assets
+        run: pnpm build
+      - name: Apply migrations to isolated CI database
+        run: pnpm db:migrate
+      - name: Verify authority API and proof chain
+        shell: bash
+        run: |
+          node scripts/run.mjs production > /tmp/sentra-ci.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..30}; do
+            if curl -fsS http://localhost:3000/api/trpc/authority.ntfyStatus > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat /tmp/sentra-ci.log
+            exit 1
+          fi
+          bash verify-demo.sh

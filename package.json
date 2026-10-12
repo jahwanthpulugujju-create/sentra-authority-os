@@ -4,13 +4,14 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
+    "dev": "node --import tsx --watch scripts/run.mjs development",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/_core/vercelApp.ts --platform=node --packages=external --bundle --format=esm --outfile=api/sentra-app.js",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "node scripts/run.mjs production",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
@@ -112,5 +113,16 @@
       "tailwindcss>nanoid": "3.3.7"
     }
   },
-  "private": true
+  "private": true,
+  "description": "Runtime authority enforcement and verifiable execution evidence for software agents.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jahwanthpulugujju-create/sentra-authority-os.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jahwanthpulugujju-create/sentra-authority-os/issues"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
 }

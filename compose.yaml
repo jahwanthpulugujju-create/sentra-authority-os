@@ -1,0 +1,21 @@
+# Local development only. Credentials are demonstration values, not deployment secrets.
+services:
+  database:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: sentra
+      MYSQL_USER: sentra
+      MYSQL_PASSWORD: sentra_local_only
+      MYSQL_ROOT_PASSWORD: root_local_only
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - sentra_database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  sentra_database:
