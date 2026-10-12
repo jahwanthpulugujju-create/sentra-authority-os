@@ -4,7 +4,7 @@
 
 **Decision:** The deterministic policy kernel returns `ALLOW`, `DENY`, `ESCALATE`, or `FREEZE`. The user interface and any planning model can propose a request but cannot write an allow result, create an executable capability, or execute the protected action.
 
-**Reason:** A natural-language proposal is not an authority grant. A fixed outcome set gives the gateway a bounded contract to enforce and lets a judge see where execution is blocked.
+**Reason:** A natural-language proposal is not an authority grant. A fixed outcome set gives the gateway a bounded contract to enforce and makes it clear where execution is blocked.
 
 ## ADR 002: Every capability is bound to one canonical request
 
@@ -24,7 +24,7 @@
 
 **Reason:** The proof timeline can be checked as an ordered sequence. The application surfaces whether the stored chain currently verifies.
 
-## ADR 005: The hackathon MVP protects one action completely
+## ADR 005: The reference workflow protects one action
 
 **Decision:** The scope is one protected vendor-approval workspace action and six deterministic scenarios.
 

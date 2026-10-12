@@ -1,5 +1,5 @@
 {
-  "name": "sentra_round2_live_demo",
+  "name": "sentra-authority-os",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
@@ -111,5 +111,6 @@
     "overrides": {
       "tailwindcss>nanoid": "3.3.7"
     }
-  }
+  },
+  "private": true
 }
